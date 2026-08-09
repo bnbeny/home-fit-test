@@ -5,3 +5,6 @@ dist-ssr
 .DS_Store
 *.tsbuildinfo
 .claude/settings.local.json
+
+# Local Netlify folder
+.netlify
