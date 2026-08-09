@@ -84,8 +84,8 @@ export const th: Translations = {
     },
     appreciationNote: (formattedPct) =>
       `เราใช้อัตราการเพิ่มมูลค่าบ้านต่อปีที่คาดการณ์เป็นค่าเริ่มต้นที่ ${formattedPct} — สมมติฐานอิงตลาดที่ช่วยให้ขั้นตอนนี้ง่ายขึ้น โดยอิงจากอัตราเติบโตทั่วไปในระยะยาวของอสังหาริมทรัพย์ที่พักอาศัยในไทย`,
-    loanTenureNote: (years, age, maxAge) =>
-      `จากอายุของคุณ (${age} ปี) และเกณฑ์อายุสูงสุด ณ วันที่หนี้ครบกำหนดที่ ${maxAge} ปี เราได้คำนวณระยะเวลาผ่อนโดยประมาณให้คุณโดยอัตโนมัติที่ ${years} ปี`,
+    loanTenureNote: (years, age, maxAge, timelineYears) =>
+      `จากอายุของคุณ (${age} ปี) ระยะเวลาที่คุณวางแผนจะซื้อ (${timelineYears} ปี) และเกณฑ์อายุสูงสุด ณ วันที่หนี้ครบกำหนดที่ ${maxAge} ปี เราได้คำนวณระยะเวลาผ่อนโดยประมาณให้คุณโดยอัตโนมัติที่ ${years} ปี`,
     assumptionsNote:
       "เราจะประเมินวงเงินกู้โดยใช้อัตราดอกเบี้ย 6% ต่อปี เพดานภาระหนี้ต่อรายได้ (DSR) ที่ 40% และค่าธรรมเนียมโอน/จดจำนองโดยประมาณ 2% ซึ่งเป็นสมมติฐานทั่วไปสำหรับการพิจารณาสินเชื่อบ้านเบื้องต้นในไทย วงเงินจริงที่ธนาคารเสนออาจแตกต่างกันไป",
   },
@@ -116,14 +116,13 @@ export const th: Translations = {
       eyebrow: "กำลังซื้อของคุณ",
       title: "สิ่งที่คุณสามารถซื้อได้",
       homeBudget: "งบประมาณบ้านโดยประมาณ",
-      homeBudgetCaption: {
-        "loan-capacity": "ถูกจำกัดโดยวงเงินกู้ที่ค่างวดที่แนะนำของคุณรองรับได้",
-        "equity-requirement": "ถูกจำกัดโดยเงินสดที่คุณมีเทียบกับเงินดาวน์ที่ต้องใช้ ไม่ใช่วงเงินกู้ของคุณ",
-        "insufficient-closing-cash":
-          "คุณยังไม่มีเงินสดสำหรับเงินดาวน์เลย — ควรออมเพิ่มก่อนที่จะมีงบประมาณบ้าน",
-      },
+      homeBudgetCaption: "อิงจากวงเงินกู้ที่ค่างวดที่แนะนำของคุณรองรับได้ บวกเงินดาวน์ที่คุณมี",
       installment: "ค่างวดต่อเดือนที่แนะนำ",
       perMonth: (formattedAmount) => `${formattedAmount} ต่อเดือน`,
+      loanTenure: "ระยะเวลาผ่อนชำระ",
+      loanTenureValue: (years) => `${years} ปี`,
+      loanTenureCaption: (age, maxAge, timelineYears) =>
+        `คำนวณอัตโนมัติจากอายุของคุณ (${age} ปี) ระยะเวลาที่วางแผนจะซื้อ (${timelineYears} ปี) และอายุสูงสุด ${maxAge} ปี ณ วันที่หนี้ครบกำหนด`,
       zoneBarLabel: "ตำแหน่งราคาบ้านเป้าหมายของคุณ",
       yourTarget: (formattedPrice) => `เป้าหมายของคุณ: ${formattedPrice}`,
       safeUpTo: (formatted) => `ปลอดภัยไม่เกิน ${formatted}`,
@@ -153,26 +152,30 @@ export const th: Translations = {
       eyebrow: "ช่องว่างและแผนการ",
       title: "แผนเฉพาะบุคคลของคุณ",
       gapLabel: "ช่องว่าง",
-      gapReady: "เงินดาวน์ของคุณครบตามที่ต้องการแล้ว คุณไม่ขาดเงินสดสำหรับเป้าหมายนี้",
-      gapShort: (formattedGap) =>
-        `ตอนนี้คุณขาดเงินอีก ${formattedGap} สำหรับเงินดาวน์และค่าธรรมเนียมการโอน`,
+      gapReady: "ราคาบ้านเป้าหมายของคุณอยู่ในงบประมาณบ้านโดยประมาณแล้ว",
+      gapShort: (formattedGap, formattedTarget) =>
+        `คุณยังขาดอีก ${formattedGap} เพื่อให้ถึงราคาบ้านเป้าหมาย ${formattedTarget} โดยคำนวณจากความสามารถในการกู้และเงินดาวน์ที่มี`,
       planLabel: "แผนการ",
       planReady: "คุณสามารถเริ่มมองหาบ้านและยื่นขอสินเชื่อเบื้องต้นได้เลย",
-      planNoSavingCapacity:
-        "ตั้งเป้าหมายการออมต่อเดือน แม้เพียงเล็กน้อย เพื่อให้เห็นระยะเวลาที่ชัดเจนในการปิดช่องว่างนี้",
-      planWithSaving: (formattedAmount, months) =>
-        `หากคุณออม ${formattedAmount} ต่อเดือน คุณจะพร้อมซื้อบ้านได้ภายใน ${months} เดือน`,
-      planWithSavingYears: (years) => ` (ประมาณ ${years} ปี)`,
-      planBehindSchedule: (months, formattedAmount) =>
-        `ด้วยอัตราการออมปัจจุบัน คุณจะต้องใช้เวลาเพิ่มอีกประมาณ ${months} เดือนจากแผนที่วางไว้ การเพิ่มเงินออมต่อเดือนอีก ${formattedAmount} หรือขยายกำหนดเป้าหมายซื้อบ้านออกไป จะช่วยปิดช่องว่างนี้ได้`,
+      planOptionDownPayment: (formattedAmount) =>
+        `ออมเงินดาวน์เพิ่มอีก ${formattedAmount} จากที่มีอยู่แล้ว เพื่อให้ถึงราคานี้โดยไม่ต้องเปลี่ยนค่างวดต่อเดือน`,
+      planOptionInstallment: (formattedAdditional, formattedTotal) =>
+        `หรือเพิ่มความสามารถผ่อนต่อเดือนอีกประมาณ ${formattedAdditional} (รวมเป็นประมาณ ${formattedTotal}) — ผ่านการเพิ่มรายได้ ลดหนี้สินที่มีอยู่ หรือขยายระยะเวลากู้ — เพื่อให้กู้ได้ตามวงเงินที่ราคานี้ต้องการ`,
+      transactionFeeNoteLabel: "ค่าธรรมเนียมที่ต้องเผื่อ",
+      transactionFeeNote: (formattedFeeAtAffordable, formattedAffordablePrice, formattedFeeAtTarget, formattedTargetPrice) =>
+        `นอกจากเงินดาวน์ อย่าลืมเผื่อค่าธรรมเนียมโอน+จดจำนอง (ประมาณ 2% ของราคาบ้าน) ด้วย — ประมาณ ${formattedFeeAtAffordable} ที่งบประมาณบ้านโดยประมาณของคุณ (${formattedAffordablePrice}) หรือประมาณ ${formattedFeeAtTarget} ที่ราคาบ้านเป้าหมาย (${formattedTargetPrice})`,
       alternativesLabel: "ทางเลือกอื่น",
       suggestions: {
-        overRiskBudget: (formattedAmount) =>
-          `บ้านเป้าหมายของคุณสูงกว่างบตึงมือ (Stretch Budget) ซึ่งเป็นเพดานบนของช่วงงบที่แนะนำ ประมาณ ${formattedAmount} — ลองพิจารณาทำเลใกล้เคียง บ้านขนาดเล็กลง หรือขยายระยะเวลาผ่อนเพื่อลดค่างวดต่อเดือน`,
-        stretchZone:
-          "บ้านเป้าหมายของคุณอยู่ในโซนตึงมือ — ยังพอไหว แต่แทบไม่มีพื้นที่เผื่อหากดอกเบี้ยขึ้นหรือมีค่าใช้จ่ายไม่คาดคิด ลองพิจารณาราคาที่ต่ำลงเล็กน้อยเพื่อให้หายใจได้คล่องขึ้น",
+        overRiskBudget: (formattedAmount) => [
+          `บ้านเป้าหมายของคุณสูงกว่างบตึงมือ (Stretch Budget) ซึ่งเป็นเพดานบนของช่วงงบที่แนะนำ ประมาณ ${formattedAmount}`,
+          "ลองพิจารณาทำเลใกล้เคียง บ้านขนาดเล็กลง หรือขยายระยะเวลาผ่อนเพื่อลดค่างวดต่อเดือน",
+        ],
+        stretchZone: [
+          "บ้านเป้าหมายของคุณอยู่ในโซนตึงมือ — ยังพอไหว แต่แทบไม่มีพื้นที่เผื่อหากดอกเบี้ยขึ้นหรือมีค่าใช้จ่ายไม่คาดคิด",
+          "ลองพิจารณาราคาที่ต่ำลงเล็กน้อยเพื่อให้หายใจได้คล่องขึ้น",
+        ],
         noSavingPlan:
-          "คุณยังไม่ได้กำหนดจำนวนเงินออมต่อเดือน ทำให้ช่องว่างเงินสดจะไม่ลดลงเอง ลองตั้งเป้าหมายการออมแม้เพียงเล็กน้อยเพื่อให้ได้ระยะเวลาที่เป็นจริง",
+          "คุณยังไม่ได้กำหนดจำนวนเงินออมต่อเดือน ทำให้เงินสดที่ยังขาดสำหรับเงินดาวน์และค่าใช้จ่ายวันโอนจะไม่ค่อยๆ ลดลงเอง ลองตั้งเป้าหมายการออมแม้เพียงเล็กน้อยเพื่อให้ได้ระยะเวลาที่เป็นจริง",
         comfortLimited:
           "เพดานค่างวดที่คุณสบายใจต่ำกว่าเพดานจากธนาคาร/งบประมาณของคุณ นี่คือส่วนต่างเพื่อความปลอดภัยที่ดี ไม่ใช่จุดอ่อน และช่วยเผื่อไว้หากดอกเบี้ยเปลี่ยนแปลง",
         lowEmergencyCushion: (formattedAmount) =>
@@ -187,14 +190,23 @@ export const th: Translations = {
       eyebrow: "ซื้อ vs เช่า",
       title: "เปรียบเทียบการซื้อและการเช่า",
 
+      basisToggle: {
+        label: "เปรียบเทียบโดยอิงจาก",
+        budgetOption: (formattedPrice) => `งบประมาณบ้านของคุณ (${formattedPrice})`,
+        targetOption: (formattedPrice) => `ราคาบ้านเป้าหมายของคุณ (${formattedPrice})`,
+      },
+
       valueHighlight: {
         eyebrow: "มูลค่าบ้านใน 10 ปี",
-        todayLabel: "งบประมาณบ้านโดยประมาณ",
+        todayLabelBudget: "งบประมาณบ้านโดยประมาณ",
+        todayLabelTarget: "ราคาบ้านเป้าหมายของคุณ",
         futureLabel: "ในอีก 10 ปี",
-        growthNote: (formattedPrice, formattedAppreciationPct) =>
-          `คำนวณจากงบประมาณบ้านที่แนะนำของคุณที่ ${formattedPrice} โดยสมมติให้มูลค่าเพิ่มขึ้นปีละ ${formattedAppreciationPct} ซึ่งเป็นค่าประมาณทั่วไปในระยะยาว`,
+        basisLabelBudget: "งบประมาณบ้านที่แนะนำของคุณ",
+        basisLabelTarget: "ราคาบ้านเป้าหมายของคุณ",
+        growthNote: (formattedPrice, formattedAppreciationPct, basisLabel) =>
+          `คำนวณจาก${basisLabel}ที่ ${formattedPrice} โดยสมมติให้มูลค่าเพิ่มขึ้นปีละ ${formattedAppreciationPct} ซึ่งเป็นค่าประมาณทั่วไปในระยะยาว`,
         rentNote:
-          "การเช่าไม่ได้สร้างส่วนของเจ้าของบ้านหรือมูลค่าทรัพย์สินใด ๆ ให้คุณ — นี่คือสิ่งที่แลกมากับความยืดหยุ่นของการเช่า ปัดไปทางตัวเลือกซื้อเพื่อดูว่างบประมาณที่แนะนำของคุณจะเติบโตเป็นเท่าไหร่ในอีก 10 ปี",
+          "การเช่าไม่ได้สร้างส่วนของเจ้าของบ้านหรือมูลค่าทรัพย์สินใด ๆ ให้คุณ — นี่คือสิ่งที่แลกมากับความยืดหยุ่นของการเช่า ปัดไปทางตัวเลือกซื้อเพื่อดูว่าราคาที่แสดงด้านบนจะเติบโตเป็นเท่าไหร่ในอีก 10 ปี",
         rentToOwnNote: (formattedPaidDown) =>
           `เงินที่จ่ายในแบบเช่าเพื่อซื้อบางส่วนจะถูกนับเข้าเป็นมูลค่าบ้าน — หลังจาก 3 ปี คุณจะผ่อนชำระไปแล้วประมาณ ${formattedPaidDown} ซึ่งนับเป็นส่วนหนึ่งของการเป็นเจ้าของบ้าน`,
       },
@@ -256,10 +268,29 @@ export const th: Translations = {
           `ซื้อ: เป็นเจ้าของทันทีและสร้างส่วนของเจ้าของบ้านในระยะยาว — ประมาณ ${formattedPayment} ต่อเดือน โดยเริ่มสร้างส่วนของเจ้าของบ้านตั้งแต่วันแรก`,
       },
 
-      rentEstimateNote: (formattedYield, formattedRent) =>
-        `เราประมาณค่าเช่าจากอัตราผลตอบแทนค่าเช่าเฉลี่ย ${formattedYield} ของราคาบ้านเป้าหมาย: ประมาณ ${formattedRent} ต่อเดือน`,
-      rentToOwnEstimateNote: (formattedContractFee, formattedMarkupPct) =>
-        `เราประมาณค่าเช่าเพื่อซื้อโดยใช้ราคาสัญญาที่สูงกว่าราคาบ้านเป้าหมาย ${formattedMarkupPct} บวกค่าทำสัญญาแบบจ่ายครั้งเดียวประมาณ ${formattedContractFee} ในวันทำสัญญา`,
+      rentEstimateNote: (formattedYield, formattedRent, basisLabel) =>
+        `เราประมาณค่าเช่าจากอัตราผลตอบแทนค่าเช่าเฉลี่ย ${formattedYield} ของ${basisLabel}: ประมาณ ${formattedRent} ต่อเดือน`,
+      rentToOwnEstimateNote: (formattedContractFee, formattedMarkupPct, basisLabel) =>
+        `เราประมาณค่าเช่าเพื่อซื้อโดยใช้ราคาสัญญาที่สูงกว่า${basisLabel} ${formattedMarkupPct} บวกค่าทำสัญญาแบบจ่ายครั้งเดียวประมาณ ${formattedContractFee} ในวันทำสัญญา`,
+    },
+  },
+
+  master: {
+    toggleLabel: "Master",
+    title: "โหมด Master",
+    subtitle: "ปรับสมมติฐานใดก็ได้ แล้วดูผลลัพธ์ทั้งหมดเปลี่ยนแบบเรียลไทม์",
+    assumptionsTitle: "สมมติฐาน",
+    answersTitle: "คำตอบของคุณ",
+    resultsTitle: "ผลลัพธ์",
+    resetButton: "รีเซ็ตเป็นค่าเริ่มต้น",
+    closeButton: "ปิด",
+    assumptionLabels: {
+      debtServiceRatio: "อัตราส่วนภาระหนี้ต่อรายได้ (DSR)",
+      annualInterestRate: "อัตราดอกเบี้ยต่อปี",
+      downPaymentRate: "อัตราเงินดาวน์ขั้นต่ำ",
+      safeBudgetMultiplier: "ตัวคูณงบประมาณที่ปลอดภัย",
+      stretchBudgetMultiplier: "ตัวคูณงบประมาณสูงสุด",
+      riskZoneMultiplier: "ตัวคูณเขตความเสี่ยง",
     },
   },
 };

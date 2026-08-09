@@ -80,6 +80,14 @@ export interface CalculationAssumptions {
   /** Gross rental yield used to estimate market rent from a home price for
    *  the Buy vs Rent wealth comparison. */
   rentalYieldPct: number;
+  /** Comfortable ceiling = this share of computed home budget (maxHomePrice). */
+  safeBudgetMultiplier: number;
+  /** Stretch ceiling as a multiple of computed home budget — 1.0 means
+   *  exactly at computed capacity. */
+  stretchBudgetMultiplier: number;
+  /** Above this multiple of computed home budget, a target price is flagged
+   *  as meaningfully over budget. */
+  riskZoneMultiplier: number;
 
   // --- Rent-to-Own (RTO) — sourced verbatim from "RTO-Payment.xlsx",
   // treated as the authoritative model for this financing path. Every value
@@ -114,6 +122,9 @@ export const DEFAULT_ASSUMPTIONS: CalculationAssumptions = {
   minLoanTermYears: 5,
   maxLoanTermYearsCap: 30,
   rentalYieldPct: 0.04,
+  safeBudgetMultiplier: 0.85,
+  stretchBudgetMultiplier: 1.0,
+  riskZoneMultiplier: 1.06,
   rtoContractFeeRate: 0.07,
   rtoPriceMarkupRate: 0.06,
   rtoPaymentPerMillion: 6800,
@@ -152,14 +163,6 @@ export interface ReadinessResult {
  *  number never reads as a black box. */
 export type BindingInstallmentCeiling = "dsr" | "budget" | "comfort";
 
-/** Why `maxHomePrice` landed where it did: capped by loan capacity, capped by
- *  the minimum-equity (down payment ratio) requirement given available cash,
- *  or the user has no cash available for a down payment at all. */
-export type HomePriceLimitingFactor =
-  | "loan-capacity"
-  | "equity-requirement"
-  | "insufficient-closing-cash";
-
 export interface PurchasingPowerResult {
   /** Bank-view ceiling: DSR-qualifying income minus existing debt. */
   affordableByDSR: number;
@@ -179,11 +182,10 @@ export interface PurchasingPowerResult {
    *  loanCapacity when available cash (not loan capacity) is the binding
    *  constraint on home price. */
   estimatedLoanAmount: number;
-  /** Maximum home price affordable once minimum down-payment ratio and
-   *  transaction costs are correctly accounted for. A pure purchasing-power
-   *  figure (see HomePriceLimitingFactor). */
+  /** Loan capacity + whatever cash is available for a down payment — a pure
+   *  loan-capacity ceiling, not a "could I close on this today" figure (see
+   *  ActionPlanResult.cashGap for that separate question). */
   maxHomePrice: number;
-  homePriceLimitingFactor: HomePriceLimitingFactor;
   safeBudget: number;
   stretchBudget: number;
   riskZoneThreshold: number;
@@ -197,6 +199,29 @@ export interface PurchasingPowerResult {
   /** How far the target home price sits above the Stretch Home Budget, in
    *  THB. Zero when at or under it. */
   overStretchAmount: number;
+
+  /** Shortfall between the target home price and maxHomePrice itself (loan
+   *  capacity + available down payment) — zero once the target is within
+   *  reach. The headline number for "The Gap & The Plan": answers "does my
+   *  loan-approved budget even reach this price," not "do I have cash to
+   *  close today" (that liquidity question is answered separately by
+   *  ActionPlanResult.cashGap, which still exists and still feeds the
+   *  Readiness Score — this field only changed what's shown in that UI
+   *  section, not the underlying cash-timeline math). */
+  priceGap: number;
+  isPriceGapClosed: boolean;
+  /** Plan option 1: additional cash for a down payment that alone would
+   *  close priceGap, holding the installment ceiling fixed. Always exactly
+   *  equals priceGap, since maxHomePrice = loanCapacity + availableDownPayment
+   *  is additive in availableDownPayment. */
+  additionalDownPaymentNeeded: number;
+  /** Plan option 2: additional monthly installment capacity that alone
+   *  would close priceGap, holding available down payment fixed. */
+  additionalMonthlyInstallmentNeeded: number;
+  /** additionalMonthlyInstallmentNeeded + recommendedMonthlyInstallment —
+   *  the total installment needed to qualify for the loan the target price
+   *  requires. */
+  requiredMonthlyInstallmentForTarget: number;
 }
 
 export type AlternativeSuggestionKey =
@@ -315,19 +340,32 @@ export interface WealthComparisonYear {
   totalRentPaid: number;
 }
 
+/** All fields rooted at whichever homePriceBasis calculateWealthComparison
+ *  was called with — see BuyVsRentOption, which is computed twice (once for
+ *  the suggested home budget, once for the user's stated target price) so
+ *  the whole Buy vs Rent section can be viewed either way. */
 export interface WealthComparisonResult {
   years: WealthComparisonYear[];
   estimatedMonthlyRent: number;
   installmentForTargetHome: number;
   loanForTargetHome: number;
   /** Same appreciation-compounding math as each `years` entry's homeValue,
-   *  but rooted at the SUGGESTED affordable home price
-   *  (PurchasingPowerResult.maxHomePrice) rather than the user's stated
-   *  target home price — powers the "10-Year Home Value" headline, which is
-   *  deliberately about what the suggested budget could grow into, not the
-   *  home the user said they want (see `years`' docstring for that
-   *  deliberate opposite choice). */
+   *  at year 10 — powers the "10-Year Home Value" headline. */
   affordableHomeValueYear10: number;
+}
+
+/** One full view of the Buy vs Rent section, computed for a single home
+ *  price basis. computeCalculatorResult produces two of these —
+ *  `buyVsRentByBudget` (homePriceBasis = PurchasingPowerResult.maxHomePrice)
+ *  and `buyVsRentByTarget` (homePriceBasis = QuestionnaireAnswers.targetHomePrice)
+ *  — so the UI can let the user toggle which one they're looking at, with
+ *  every number in the section (RTO price/payment, monthly cash flow, 10-year
+ *  home value) recomputed for that basis rather than mixing the two. */
+export interface BuyVsRentOption {
+  homePriceBasis: number;
+  wealthComparison: WealthComparisonResult;
+  rentToOwn: RentToOwnResult;
+  cashFlow: BuyVsRentCashFlowResult;
 }
 
 export interface CalculatorResult {
@@ -335,7 +373,6 @@ export interface CalculatorResult {
   actionPlan: ActionPlanResult;
   readiness: ReadinessResult;
   advisoryNotices: AdvisoryNotice[];
-  buyVsRentCashFlow: BuyVsRentCashFlowResult;
-  wealthComparison: WealthComparisonResult;
-  rentToOwn: RentToOwnResult;
+  buyVsRentByBudget: BuyVsRentOption;
+  buyVsRentByTarget: BuyVsRentOption;
 }

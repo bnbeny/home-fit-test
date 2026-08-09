@@ -17,7 +17,11 @@ export function StepHomeGoals({ answers, onUpdate }: StepProps) {
     { value: "live-in", label: t.homeGoals.purchasePurposeOptions["live-in"] },
     { value: "investment", label: t.homeGoals.purchasePurposeOptions.investment },
   ];
-  const loanTenureYears = calculateMaxLoanTermYears(answers.applicantAge, DEFAULT_ASSUMPTIONS);
+  const loanTenureYears = calculateMaxLoanTermYears(
+    answers.applicantAge,
+    answers.targetTimelineMonths,
+    DEFAULT_ASSUMPTIONS,
+  );
 
   return (
     <div className="space-y-6">
@@ -54,6 +58,7 @@ export function StepHomeGoals({ answers, onUpdate }: StepProps) {
             loanTenureYears,
             answers.applicantAge,
             DEFAULT_ASSUMPTIONS.maxAgeAtLoanMaturity,
+            Math.ceil(answers.targetTimelineMonths / 12),
           )}
         </p>
         <p>{t.homeGoals.appreciationNote(formatPercent(answers.expectedAppreciationPct))}</p>

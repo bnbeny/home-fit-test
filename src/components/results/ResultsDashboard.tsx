@@ -7,19 +7,27 @@ import { BuyVsRentComparison } from "./BuyVsRentComparison";
 import { computeCalculatorResult } from "../../lib/calculations";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { DEFAULT_ASSUMPTIONS } from "../../types/finance";
-import type { QuestionnaireAnswers } from "../../types/finance";
+import type { CalculationAssumptions, QuestionnaireAnswers } from "../../types/finance";
 
 interface ResultsDashboardProps {
   answers: QuestionnaireAnswers;
   onEditAnswers: () => void;
+  /** Defaults to DEFAULT_ASSUMPTIONS. Only the Master view passes a
+   *  different (live-edited) value — the normal questionnaire flow always
+   *  runs on the real defaults. */
+  assumptions?: CalculationAssumptions;
 }
 
-export function ResultsDashboard({ answers, onEditAnswers }: ResultsDashboardProps) {
+export function ResultsDashboard({
+  answers,
+  onEditAnswers,
+  assumptions = DEFAULT_ASSUMPTIONS,
+}: ResultsDashboardProps) {
   const { t } = useLanguage();
 
   const result = useMemo(
-    () => computeCalculatorResult(answers, DEFAULT_ASSUMPTIONS),
-    [answers],
+    () => computeCalculatorResult(answers, assumptions),
+    [answers, assumptions],
   );
 
   return (
@@ -37,15 +45,17 @@ export function ResultsDashboard({ answers, onEditAnswers }: ResultsDashboardPro
           purchasingPower={result.purchasingPower}
           targetHomePrice={answers.targetHomePrice}
           actionPlan={result.actionPlan}
+          applicantAge={answers.applicantAge}
+          maxAgeAtLoanMaturity={assumptions.maxAgeAtLoanMaturity}
+          transactionCostRate={assumptions.transactionCostRate}
+          targetTimelineMonths={answers.targetTimelineMonths}
         />
         <AdvisoryNotices notices={result.advisoryNotices} />
         <BuyVsRentComparison
-          cashFlow={result.buyVsRentCashFlow}
-          wealthComparison={result.wealthComparison}
-          purchasingPower={result.purchasingPower}
-          rentToOwn={result.rentToOwn}
-          rentalYieldPct={DEFAULT_ASSUMPTIONS.rentalYieldPct}
-          rtoPriceMarkupPct={DEFAULT_ASSUMPTIONS.rtoPriceMarkupRate}
+          byBudget={result.buyVsRentByBudget}
+          byTarget={result.buyVsRentByTarget}
+          rentalYieldPct={assumptions.rentalYieldPct}
+          rtoPriceMarkupPct={assumptions.rtoPriceMarkupRate}
           appreciationPct={answers.expectedAppreciationPct}
         />
       </div>

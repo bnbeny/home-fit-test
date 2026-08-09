@@ -12,6 +12,10 @@ interface PurchasingPowerProps {
   purchasingPower: PurchasingPowerResult;
   targetHomePrice: number;
   actionPlan: ActionPlanResult;
+  applicantAge: number;
+  maxAgeAtLoanMaturity: number;
+  transactionCostRate: number;
+  targetTimelineMonths: number;
 }
 
 /** Which of the three ceilings (bank DSR, household budget, personal
@@ -34,21 +38,24 @@ function getInstallmentRationale(
   );
 }
 
+/** over-risk-budget and stretch-zone each render as 2 bullets (the gap
+ *  itself, then the suggestion) instead of 1 combined sentence — everything
+ *  else is a single bullet. */
 function renderSuggestion(
   suggestion: AlternativeSuggestion,
   suggestions: Translations["results"]["gapAndPlan"]["suggestions"],
-): string {
+): string[] {
   switch (suggestion.key) {
     case "over-risk-budget":
       return suggestions.overRiskBudget(formatTHB(suggestion.amountTHB ?? 0));
     case "stretch-zone":
       return suggestions.stretchZone;
     case "no-saving-plan":
-      return suggestions.noSavingPlan;
+      return [suggestions.noSavingPlan];
     case "comfort-limited":
-      return suggestions.comfortLimited;
+      return [suggestions.comfortLimited];
     case "low-emergency-cushion":
-      return suggestions.lowEmergencyCushion(formatTHB(suggestion.amountTHB ?? 0));
+      return [suggestions.lowEmergencyCushion(formatTHB(suggestion.amountTHB ?? 0))];
   }
 }
 
@@ -69,7 +76,15 @@ function ChevronIcon({ className }: { className?: string }) {
   );
 }
 
-export function PurchasingPower({ purchasingPower, targetHomePrice, actionPlan }: PurchasingPowerProps) {
+export function PurchasingPower({
+  purchasingPower,
+  targetHomePrice,
+  actionPlan,
+  applicantAge,
+  maxAgeAtLoanMaturity,
+  transactionCostRate,
+  targetTimelineMonths,
+}: PurchasingPowerProps) {
   const { t } = useLanguage();
   const copy = t.results.purchasingPower;
   const gapCopy = t.results.gapAndPlan;
@@ -77,55 +92,53 @@ export function PurchasingPower({ purchasingPower, targetHomePrice, actionPlan }
   const gapContentId = useId();
 
   const {
-    cashGap,
-    isDownPaymentReady,
-    monthsToReady,
-    yearsToReady,
-    isOnTargetTimeline,
-    shortfallMonths,
-    suggestedMonthlySavingsIncrease,
-    monthlySavingCapacity,
-  } = actionPlan;
+    priceGap,
+    isPriceGapClosed,
+    additionalDownPaymentNeeded,
+    additionalMonthlyInstallmentNeeded,
+    requiredMonthlyInstallmentForTarget,
+  } = purchasingPower;
 
-  // "over-risk-budget" and "stretch-zone" relate to the target home price
-  // specifically — they're surfaced as a hover/focus popup on "Your target"
-  // in the budget bar below instead of listed here (see BudgetZoneBar), so
-  // they're excluded from this list to avoid saying the same thing twice.
-  const listedSuggestions = actionPlan.alternativeSuggestions.filter(
-    (suggestion) => suggestion.key !== "over-risk-budget" && suggestion.key !== "stretch-zone",
-  );
+  // Always shown (not conditional, unlike the suggestions below) — the fee
+  // actually owed depends on which price the buyer lands at, so both are
+  // shown rather than picking one.
+  const feeAtAffordablePrice = purchasingPower.maxHomePrice * transactionCostRate;
+  const feeAtTargetPrice = targetHomePrice * transactionCostRate;
 
   let planContent: ReactNode;
-  if (isDownPaymentReady) {
+  if (isPriceGapClosed) {
     planContent = gapCopy.planReady;
-  } else if (monthlySavingCapacity <= 0) {
-    planContent = gapCopy.planNoSavingCapacity;
-  } else if (isOnTargetTimeline === false && shortfallMonths !== null) {
-    // Exact required pattern for the behind-schedule case, replacing the
-    // on-track sentence rather than supplementing it.
-    planContent = gapCopy.planBehindSchedule(shortfallMonths, formatTHB(suggestedMonthlySavingsIncrease ?? 0));
   } else {
     planContent = (
       <>
-        {gapCopy.planWithSaving(formatTHB(monthlySavingCapacity), monthsToReady ?? 0)}
-        {yearsToReady !== null && yearsToReady > 0 && gapCopy.planWithSavingYears(yearsToReady)}
-        {"."}
+        <p>{gapCopy.planOptionDownPayment(formatTHB(additionalDownPaymentNeeded))}</p>
+        <p className="mt-2">
+          {gapCopy.planOptionInstallment(
+            formatTHB(additionalMonthlyInstallmentNeeded),
+            formatTHB(requiredMonthlyInstallmentForTarget),
+          )}
+        </p>
       </>
     );
   }
 
   return (
     <Card eyebrow={copy.eyebrow} title={copy.title}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatTile
           label={copy.homeBudget}
           value={formatTHB(purchasingPower.maxHomePrice)}
-          caption={copy.homeBudgetCaption[purchasingPower.homePriceLimitingFactor]}
+          caption={copy.homeBudgetCaption}
         />
         <StatTile
           label={copy.installment}
           value={copy.perMonth(formatTHB(purchasingPower.recommendedMonthlyInstallment))}
           caption={getInstallmentRationale(purchasingPower, copy.installmentRationale)}
+        />
+        <StatTile
+          label={copy.loanTenure}
+          value={copy.loanTenureValue(purchasingPower.effectiveLoanTermYears)}
+          caption={copy.loanTenureCaption(applicantAge, maxAgeAtLoanMaturity, Math.ceil(targetTimelineMonths / 12))}
         />
       </div>
 
@@ -172,23 +185,41 @@ export function PurchasingPower({ purchasingPower, targetHomePrice, actionPlan }
               <div className="rounded-lg bg-surface-sunken p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{gapCopy.gapLabel}</p>
                 <p className="mt-1 text-sm text-ink">
-                  {isDownPaymentReady ? gapCopy.gapReady : gapCopy.gapShort(formatTHB(cashGap))}
+                  {isPriceGapClosed
+                    ? gapCopy.gapReady
+                    : gapCopy.gapShort(formatTHB(priceGap), formatTHB(targetHomePrice))}
                 </p>
               </div>
 
               <div className="rounded-lg bg-surface-sunken p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{gapCopy.planLabel}</p>
-                <p className="mt-1 text-sm text-ink">{planContent}</p>
+                <div className="mt-1 text-sm text-ink">{planContent}</div>
               </div>
 
-              {listedSuggestions.length > 0 && (
+              <div className="rounded-lg bg-surface-sunken p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  {gapCopy.transactionFeeNoteLabel}
+                </p>
+                <p className="mt-1 text-sm text-ink">
+                  {gapCopy.transactionFeeNote(
+                    formatTHB(feeAtAffordablePrice),
+                    formatTHB(purchasingPower.maxHomePrice),
+                    formatTHB(feeAtTargetPrice),
+                    formatTHB(targetHomePrice),
+                  )}
+                </p>
+              </div>
+
+              {actionPlan.alternativeSuggestions.length > 0 && (
                 <div className="rounded-lg bg-surface-sunken p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     {gapCopy.alternativesLabel}
                   </p>
                   <ul className="mt-2 list-disc space-y-1.5 pl-4 text-sm text-ink">
-                    {listedSuggestions.map((suggestion) => (
-                      <li key={suggestion.key}>{renderSuggestion(suggestion, gapCopy.suggestions)}</li>
+                    {actionPlan.alternativeSuggestions.map((suggestion) => (
+                      <li key={suggestion.key}>
+                        {renderSuggestion(suggestion, gapCopy.suggestions).join(" ")}
+                      </li>
                     ))}
                   </ul>
                 </div>

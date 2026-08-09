@@ -1,25 +1,21 @@
 import { useId, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode, SVGProps } from "react";
 import { Card } from "../ui/Card";
+import { SegmentedControl } from "../ui/SegmentedControl";
 import { CASH_FLOW_RISK_STYLES } from "./cashFlowRiskStyles";
 import { formatPercent, formatTHB } from "../../lib/calculations";
 import { useLanguage } from "../../i18n/LanguageContext";
-import type {
-  BuyVsRentCashFlowResult,
-  CashFlowBreakdown,
-  PurchasingPowerResult,
-  RentToOwnResult,
-  WealthComparisonResult,
-} from "../../types/finance";
+import type { BuyVsRentOption, CashFlowBreakdown } from "../../types/finance";
 import type { Translations } from "../../i18n/types";
 
 interface BuyVsRentComparisonProps {
-  cashFlow: BuyVsRentCashFlowResult;
-  wealthComparison: WealthComparisonResult;
-  purchasingPower: PurchasingPowerResult;
-  rentToOwn: RentToOwnResult;
+  /** Every number in this section recomputed for the suggested home budget
+   *  (purchasingPower.maxHomePrice) as the basis price. */
+  byBudget: BuyVsRentOption;
+  /** Same, but for the user's stated target home price as the basis. */
+  byTarget: BuyVsRentOption;
   rentalYieldPct: number;
-  /** Markup the RTO contract price carries over the target home price — a
+  /** Markup the RTO contract price carries over the basis home price — a
    *  fixed policy constant (CalculationAssumptions.rtoPriceMarkupRate,
    *  sourced from RTO-Payment.xlsx), not user-derived, so it's passed
    *  through directly the same way rentalYieldPct already is. */
@@ -28,6 +24,7 @@ interface BuyVsRentComparisonProps {
 }
 
 type ScenarioKey = "rent" | "rentToOwn" | "buy";
+type HomePriceBasisKey = "budget" | "target";
 
 const SECTION_LABEL_CLASS = "text-xs font-semibold uppercase tracking-wide text-ink-muted";
 
@@ -277,10 +274,8 @@ const DRAG_COMMIT_RATIO = 0.18;
 const FLICK_VELOCITY_PX_MS = 0.5;
 
 export function BuyVsRentComparison({
-  cashFlow,
-  wealthComparison,
-  purchasingPower,
-  rentToOwn,
+  byBudget,
+  byTarget,
   rentalYieldPct,
   rtoPriceMarkupPct,
   appreciationPct,
@@ -288,9 +283,17 @@ export function BuyVsRentComparison({
   const { t } = useLanguage();
   const copy = t.results.buyVsRent;
 
-  // Rooted at the SUGGESTED affordable home budget (maxHomePrice), not the
-  // user's stated target home price — see WealthComparisonResult's
-  // affordableHomeValueYear10 docstring.
+  // Which home price basis the whole section is rooted at right now — every
+  // number below (RTO, monthly cash flow, 10-year value) comes from
+  // `selected`, recomputed for that basis (see BuyVsRentOption). Defaults to
+  // "budget" — the more realistic/actionable ceiling — but either is a
+  // complete, self-consistent view.
+  const [basis, setBasis] = useState<HomePriceBasisKey>("budget");
+  const selected = basis === "budget" ? byBudget : byTarget;
+  const { cashFlow, wealthComparison, rentToOwn } = selected;
+  const todayLabel = basis === "budget" ? copy.valueHighlight.todayLabelBudget : copy.valueHighlight.todayLabelTarget;
+  const basisLabel = basis === "budget" ? copy.valueHighlight.basisLabelBudget : copy.valueHighlight.basisLabelTarget;
+
   const homeValueYearTen = wealthComparison.affordableHomeValueYear10;
 
   // Order matters here: Rent -> Rent-to-Own -> Buy is the deliberate
@@ -410,6 +413,18 @@ export function BuyVsRentComparison({
   return (
     <Card eyebrow={copy.eyebrow} title={copy.title}>
       <div className="space-y-8">
+        {/* Home price basis toggle — governs every number below (RTO,
+            monthly cash flow, 10-year value), not just this block. */}
+        <SegmentedControl
+          label={copy.basisToggle.label}
+          value={basis}
+          onChange={setBasis}
+          options={[
+            { value: "budget", label: copy.basisToggle.budgetOption(formatTHB(byBudget.homePriceBasis)) },
+            { value: "target", label: copy.basisToggle.targetOption(formatTHB(byTarget.homePriceBasis)) },
+          ]}
+        />
+
         {/* 10-year home value — the primary visual focus while Buy is
             active. Renting builds no equivalent asset, and Rent-to-Own
             builds toward ownership on its own terms, so each of those
@@ -426,9 +441,9 @@ export function BuyVsRentComparison({
             <>
               <div className="mt-3 flex flex-wrap items-center gap-3 sm:gap-5">
                 <div>
-                  <p className="text-xs font-medium text-ink-muted">{copy.valueHighlight.todayLabel}</p>
+                  <p className="text-xs font-medium text-ink-muted">{todayLabel}</p>
                   <p className="hero-figure mt-0.5 text-2xl font-bold text-ink-muted sm:text-3xl">
-                    {formatTHB(purchasingPower.maxHomePrice)}
+                    {formatTHB(selected.homePriceBasis)}
                   </p>
                 </div>
                 <ArrowRightIcon className="h-5 w-5 shrink-0 text-ink-muted sm:h-6 sm:w-6" />
@@ -441,8 +456,9 @@ export function BuyVsRentComparison({
               </div>
               <p className="mt-3 text-sm text-ink-muted">
                 {copy.valueHighlight.growthNote(
-                  formatTHB(purchasingPower.maxHomePrice),
+                  formatTHB(selected.homePriceBasis),
                   formatPercent(appreciationPct, 1),
+                  basisLabel,
                 )}
               </p>
             </>
@@ -613,10 +629,14 @@ export function BuyVsRentComparison({
       </div>
 
       <p className="mt-4 text-xs text-ink-muted">
-        {copy.rentEstimateNote(formatPercent(rentalYieldPct, 1), formatTHB(wealthComparison.estimatedMonthlyRent))}
+        {copy.rentEstimateNote(
+          formatPercent(rentalYieldPct, 1),
+          formatTHB(wealthComparison.estimatedMonthlyRent),
+          basisLabel,
+        )}
       </p>
       <p className="mt-1 text-xs text-ink-muted">
-        {copy.rentToOwnEstimateNote(formatTHB(rentToOwn.contractFeeTHB), formatPercent(rtoPriceMarkupPct, 0))}
+        {copy.rentToOwnEstimateNote(formatTHB(rentToOwn.contractFeeTHB), formatPercent(rtoPriceMarkupPct, 0), basisLabel)}
       </p>
     </Card>
   );

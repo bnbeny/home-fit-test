@@ -3,7 +3,6 @@ import type {
   ArchetypeKey,
   CashFlowRiskLevel,
   EmploymentType,
-  HomePriceLimitingFactor,
   HomePurchasePurpose,
   ReadinessStatus,
 } from "../types/finance";
@@ -91,8 +90,11 @@ export interface Translations {
      *  place of the (removed) appreciation slider. */
     appreciationNote: (formattedPct: string) => string;
     /** Static remark explaining the auto-calculated loan tenure, shown in
-     *  place of the (removed) loan-term picker. */
-    loanTenureNote: (years: number, age: number, maxAge: number) => string;
+     *  place of the (removed) loan-term picker. timelineYears is the
+     *  ceil(targetTimelineMonths / 12) figure the age gets pushed forward by
+     *  before checking the maturity cap — the loan originates at purchase,
+     *  not today, so the timeline counts against the cap too. */
+    loanTenureNote: (years: number, age: number, maxAge: number, timelineYears: number) => string;
     /** Static disclosure of the other fixed lending assumptions (interest
      *  rate, DSR, transaction costs) — previously shown on its own "Loan
      *  preferences" step, now folded into the last step of the form. */
@@ -116,10 +118,14 @@ export interface Translations {
       /** Estimated max affordable home price — a pure purchasing-power
        *  figure (income, debt, loan capacity, available down-payment cash). */
       homeBudget: string;
-      /** Why maxHomePrice landed where it did, keyed by HomePriceLimitingFactor. */
-      homeBudgetCaption: Record<HomePriceLimitingFactor, string>;
+      homeBudgetCaption: string;
       installment: string;
       perMonth: (formattedAmount: string) => string;
+      /** Third stat tile — the loan tenor (term) actually usable after the
+       *  age-based maturity cap, i.e. PurchasingPowerResult.effectiveLoanTermYears. */
+      loanTenure: string;
+      loanTenureValue: (years: number) => string;
+      loanTenureCaption: (age: number, maxAge: number, timelineYears: number) => string;
       zoneBarLabel: string;
       yourTarget: (formattedPrice: string) => string;
       safeUpTo: (formatted: string) => string;
@@ -147,22 +153,37 @@ export interface Translations {
       eyebrow: string;
       title: string;
       gapLabel: string;
+      /** Shown when purchasingPower.isPriceGapClosed is true. */
       gapReady: string;
-      gapShort: (formattedGap: string) => string;
+      /** purchasingPower.priceGap framing: "does my loan-approved budget
+       *  reach the target price," not a cash-at-closing question. */
+      gapShort: (formattedGap: string, formattedTarget: string) => string;
       planLabel: string;
+      /** Shown when purchasingPower.isPriceGapClosed is true. */
       planReady: string;
-      planNoSavingCapacity: string;
-      planWithSaving: (formattedAmount: string, months: number) => string;
-      planWithSavingYears: (years: number) => string;
-      /** Exact required pattern for the behind-schedule case: "At your
-       *  current saving rate, you'll need about {months} more months than
-       *  planned. Increasing your monthly savings by {amount} or delaying
-       *  your target purchase date would close the gap." */
-      planBehindSchedule: (months: number, formattedAmount: string) => string;
+      /** Plan option 1 — additionalDownPaymentNeeded. */
+      planOptionDownPayment: (formattedAmount: string) => string;
+      /** Plan option 2 — additionalMonthlyInstallmentNeeded +
+       *  requiredMonthlyInstallmentForTarget. */
+      planOptionInstallment: (formattedAdditional: string, formattedTotal: string) => string;
+      /** Always-shown reminder (not conditional, unlike the suggestions
+       *  below) that transfer + mortgage-registration fees are a real cash
+       *  cost on top of the down payment — shown at both the estimated
+       *  home budget (maxHomePrice) and the target home price, since the
+       *  actual fee depends on which price the buyer ends up at. */
+      transactionFeeNoteLabel: string;
+      transactionFeeNote: (
+        formattedFeeAtAffordable: string,
+        formattedAffordablePrice: string,
+        formattedFeeAtTarget: string,
+        formattedTargetPrice: string,
+      ) => string;
       alternativesLabel: string;
       suggestions: {
-        overRiskBudget: (formattedAmount: string) => string;
-        stretchZone: string;
+        /** [fact, suggestion] — two separate bullet points (the gap itself,
+         *  then what to do about it), rather than one combined sentence. */
+        overRiskBudget: (formattedAmount: string) => [string, string];
+        stretchZone: [string, string];
         noSavingPlan: string;
         comfortLimited: string;
         lowEmergencyCushion: (formattedAmount: string) => string;
@@ -175,9 +196,18 @@ export interface Translations {
       eyebrow: string;
       title: string;
 
-      /** Section 1 — the page's primary visual focus: the SUGGESTED
-       *  affordable home budget (not the user's stated target home price)
-       *  vs. its estimated value after 10 years of compounding
+      /** Toggle governing every number in this section: whichever home
+       *  price basis is selected (the suggested home budget, or the user's
+       *  stated target price) is what RTO, monthly cash flow, and the
+       *  10-year value all get computed from — see BuyVsRentOption. */
+      basisToggle: {
+        label: string;
+        budgetOption: (formattedPrice: string) => string;
+        targetOption: (formattedPrice: string) => string;
+      };
+
+      /** Section 1 — the page's primary visual focus: the selected basis
+       *  price vs. its estimated value after 10 years of compounding
        *  appreciation. A structural fact about buying, so this swaps out
        *  for `rentNote` / `rentToOwnNote` while a different slide is active
        *  — renting builds no equivalent asset, by definition, and
@@ -189,9 +219,17 @@ export interface Translations {
        *  confusing.) */
       valueHighlight: {
         eyebrow: string;
-        todayLabel: string;
+        /** Label above the "today" figure — depends on which basisToggle
+         *  option is selected, so it never says "Estimated home budget"
+         *  while actually showing the target price, or vice versa. */
+        todayLabelBudget: string;
+        todayLabelTarget: string;
         futureLabel: string;
-        growthNote: (formattedPrice: string, formattedAppreciationPct: string) => string;
+        /** Lowercase noun phrases ("your suggested home budget" / "your
+         *  target home price") interpolated into growthNote below. */
+        basisLabelBudget: string;
+        basisLabelTarget: string;
+        growthNote: (formattedPrice: string, formattedAppreciationPct: string, basisLabel: string) => string;
         /** Shown in place of the value figures while the Rent slide is active. */
         rentNote: string;
         /** Shown in place of the value figures while the Rent-to-Own slide
@@ -280,10 +318,41 @@ export interface Translations {
         buySummary: (formattedPayment: string) => string;
       };
 
-      rentEstimateNote: (formattedYield: string, formattedRent: string) => string;
+      /** basisLabel: same lowercase noun phrase as valueHighlight.basisLabelBudget
+       *  / basisLabelTarget — this footnote must name whichever basis is
+       *  actually active, not hardcode "target home price". */
+      rentEstimateNote: (formattedYield: string, formattedRent: string, basisLabel: string) => string;
       /** Footnote disclosing the Rent-to-Own assumptions, analogous to
        *  rentEstimateNote — sourced from RTO-Payment.xlsx. */
-      rentToOwnEstimateNote: (formattedContractFee: string, formattedMarkupPct: string) => string;
+      rentToOwnEstimateNote: (formattedContractFee: string, formattedMarkupPct: string, basisLabel: string) => string;
+    };
+  };
+
+  /** Admin/debug view — a live sandbox exposing the 6 core assumptions
+   *  (DEFAULT_ASSUMPTIONS in finance.ts) as editable controls next to the
+   *  full results dashboard, so a reviewer can see how tuning any single
+   *  assumption ripples through every downstream number. Never alters the
+   *  assumptions the normal questionnaire flow uses. */
+  master: {
+    /** Top-left header button that opens/closes this view. */
+    toggleLabel: string;
+    title: string;
+    subtitle: string;
+    assumptionsTitle: string;
+    /** Title above the accordion of all 6 questionnaire steps (Income,
+     *  Debt, Expenses, Savings, About You, Home Goals), reusing
+     *  form.stepLabels for each section's own header. */
+    answersTitle: string;
+    resultsTitle: string;
+    resetButton: string;
+    closeButton: string;
+    assumptionLabels: {
+      debtServiceRatio: string;
+      annualInterestRate: string;
+      downPaymentRate: string;
+      safeBudgetMultiplier: string;
+      stretchBudgetMultiplier: string;
+      riskZoneMultiplier: string;
     };
   };
 }

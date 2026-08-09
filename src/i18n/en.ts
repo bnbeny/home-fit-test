@@ -90,8 +90,8 @@ export const en: Translations = {
     },
     appreciationNote: (formattedPct) =>
       `We use a default expected annual home appreciation of ${formattedPct} — a market-based assumption used to simplify this experience, based on typical long-run growth for Thai residential property.`,
-    loanTenureNote: (years, age, maxAge) =>
-      `Based on your age (${age}) and a common maximum age of ${maxAge} at loan maturity, we've calculated an estimated loan tenure of ${years} years for you automatically.`,
+    loanTenureNote: (years, age, maxAge, timelineYears) =>
+      `Based on your age (${age}), your ${timelineYears}-year timeline to buy, and a common maximum age of ${maxAge} at loan maturity, we've calculated an estimated loan tenure of ${years} years for you automatically.`,
     assumptionsNote:
       "We'll estimate your loan using a standard 6% annual interest rate, a 40% debt-service ceiling, and an estimated 2% for transfer and mortgage registration fees — typical assumptions for a Thai mortgage pre-qualification. Your bank's actual offer may vary.",
   },
@@ -122,15 +122,14 @@ export const en: Translations = {
       eyebrow: "Your purchasing power",
       title: "What you can afford",
       homeBudget: "Estimated home budget",
-      homeBudgetCaption: {
-        "loan-capacity": "Capped by how much loan your recommended installment can support.",
-        "equity-requirement":
-          "Capped by your available cash relative to the required down payment — not your loan capacity.",
-        "insufficient-closing-cash":
-          "You don't have any cash available yet for a down payment — build this up before a home budget applies.",
-      },
+      homeBudgetCaption:
+        "Based on how much loan your recommended installment can support, plus your available down payment.",
       installment: "Recommended monthly installment",
       perMonth: (formattedAmount) => `${formattedAmount}/mo`,
+      loanTenure: "Loan tenure",
+      loanTenureValue: (years) => `${years} years`,
+      loanTenureCaption: (age, maxAge, timelineYears) =>
+        `Auto-calculated from your age (${age}), your ${timelineYears}-year timeline to buy, and a maximum age of ${maxAge} at loan maturity.`,
       zoneBarLabel: "Where your target home price falls",
       yourTarget: (formattedPrice) => `Your target: ${formattedPrice}`,
       safeUpTo: (formatted) => `Safe up to ${formatted}`,
@@ -160,26 +159,30 @@ export const en: Translations = {
       eyebrow: "The gap & the plan",
       title: "Your personalized plan",
       gapLabel: "The gap",
-      gapReady: "Your down payment is fully covered — you're not short on cash for this goal.",
-      gapShort: (formattedGap) =>
-        `You are currently short ${formattedGap} for your down payment and transaction costs.`,
+      gapReady: "Your target home price is within your estimated home budget.",
+      gapShort: (formattedGap, formattedTarget) =>
+        `You're short ${formattedGap} to reach your target home price of ${formattedTarget}, based on your loan capacity and available down payment.`,
       planLabel: "The plan",
       planReady: "You can start the home search and pre-approval process now.",
-      planNoSavingCapacity:
-        "Set a monthly saving target — even a modest one — to turn this gap into a concrete timeline.",
-      planWithSaving: (formattedAmount, months) =>
-        `If you save ${formattedAmount} per month, you'll be ready to buy in ${months} month(s)`,
-      planWithSavingYears: (years) => ` (about ${years} years)`,
-      planBehindSchedule: (months, formattedAmount) =>
-        `At your current saving rate, you'll need about ${months} more month(s) than planned. Increasing your monthly savings by ${formattedAmount} or delaying your target purchase date would close the gap.`,
+      planOptionDownPayment: (formattedAmount) =>
+        `Save an additional ${formattedAmount} for your down payment — on top of what you already have — to reach this price without changing your monthly installment.`,
+      planOptionInstallment: (formattedAdditional, formattedTotal) =>
+        `Or increase your monthly installment capacity by about ${formattedAdditional} (to about ${formattedTotal} total) — through higher income, lower existing debt, or a longer loan term — to qualify for the loan this price needs.`,
+      transactionFeeNoteLabel: "Fees to budget for",
+      transactionFeeNote: (formattedFeeAtAffordable, formattedAffordablePrice, formattedFeeAtTarget, formattedTargetPrice) =>
+        `On top of your down payment, budget for transfer and mortgage-registration fees (about 2% of price): roughly ${formattedFeeAtAffordable} at your estimated home budget of ${formattedAffordablePrice}, or roughly ${formattedFeeAtTarget} at your target home price of ${formattedTargetPrice}.`,
       alternativesLabel: "Alternative options",
       suggestions: {
-        overRiskBudget: (formattedAmount) =>
-          `Your target home is about ${formattedAmount} above your Stretch Budget — the top of your recommended range — consider nearby neighborhoods, a smaller unit, or a longer loan term to lower the monthly installment.`,
-        stretchZone:
-          "Your target home sits in the stretch zone — it's reachable, but leaves little room for rate increases or surprise costs. A slightly lower price point would add breathing room.",
+        overRiskBudget: (formattedAmount) => [
+          `Your target home is about ${formattedAmount} above your Stretch Budget — the top of your recommended range.`,
+          "Consider nearby neighborhoods, a smaller unit, or a longer loan term to lower the monthly installment.",
+        ],
+        stretchZone: [
+          "Your target home sits in the stretch zone — it's reachable, but leaves little room for rate increases or surprise costs.",
+          "A slightly lower price point would add breathing room.",
+        ],
         noSavingPlan:
-          "You haven't allocated a monthly saving amount, so the cash gap won't close on its own — set even a modest monthly saving target to get a realistic timeline.",
+          "You haven't allocated a monthly saving amount, so the cash you still need for your down payment and closing costs won't build up on its own — set even a modest monthly saving target to get a realistic timeline.",
         comfortLimited:
           "Your comfortable payment ceiling is lower than your bank/budget ceiling — that's a healthy safety margin, not a weakness, and keeps room for rate changes.",
         lowEmergencyCushion: (formattedAmount) =>
@@ -194,14 +197,23 @@ export const en: Translations = {
       eyebrow: "Buy vs rent",
       title: "How buying and renting compare",
 
+      basisToggle: {
+        label: "Compare based on",
+        budgetOption: (formattedPrice) => `Your home budget (${formattedPrice})`,
+        targetOption: (formattedPrice) => `Your target price (${formattedPrice})`,
+      },
+
       valueHighlight: {
         eyebrow: "10-year home value",
-        todayLabel: "Estimated home budget",
+        todayLabelBudget: "Estimated home budget",
+        todayLabelTarget: "Your target price",
         futureLabel: "In 10 years",
-        growthNote: (formattedPrice, formattedAppreciationPct) =>
-          `Based on your suggested home budget of ${formattedPrice}, growing at ${formattedAppreciationPct} expected annual appreciation over 10 years.`,
+        basisLabelBudget: "your suggested home budget",
+        basisLabelTarget: "your target home price",
+        growthNote: (formattedPrice, formattedAppreciationPct, basisLabel) =>
+          `Based on ${basisLabel} of ${formattedPrice}, growing at ${formattedAppreciationPct} expected annual appreciation over 10 years.`,
         rentNote:
-          "Renting builds no home equity or property value — that's the trade-off for its flexibility. Swipe ahead to Buy to see what your suggested budget could grow into over 10 years.",
+          "Renting builds no home equity or property value — that's the trade-off for its flexibility. Swipe ahead to Buy to see what the price shown above could grow into over 10 years.",
         rentToOwnNote: (formattedPaidDown) =>
           `Part of every Rent-to-Own payment counts toward the home's price. After 3 years, about ${formattedPaidDown} would be paid down toward ownership.`,
       },
@@ -264,10 +276,29 @@ export const en: Translations = {
           `Buy: immediate ownership and long-term home equity — about ${formattedPayment}/month, building equity from day one.`,
       },
 
-      rentEstimateNote: (formattedYield, formattedRent) =>
-        `We estimate rent using a ${formattedYield} average rental return on your target home price — about ${formattedRent}/month.`,
-      rentToOwnEstimateNote: (formattedContractFee, formattedMarkupPct) =>
-        `We estimate Rent-to-Own using a contract price ${formattedMarkupPct} above your target home price, plus a one-time contract fee of about ${formattedContractFee} due at signing.`,
+      rentEstimateNote: (formattedYield, formattedRent, basisLabel) =>
+        `We estimate rent using a ${formattedYield} average rental return on ${basisLabel} — about ${formattedRent}/month.`,
+      rentToOwnEstimateNote: (formattedContractFee, formattedMarkupPct, basisLabel) =>
+        `We estimate Rent-to-Own using a contract price ${formattedMarkupPct} above ${basisLabel}, plus a one-time contract fee of about ${formattedContractFee} due at signing.`,
+    },
+  },
+
+  master: {
+    toggleLabel: "Master",
+    title: "Master version",
+    subtitle: "Tune any assumption and watch every result update live.",
+    assumptionsTitle: "Assumptions",
+    answersTitle: "Your answers",
+    resultsTitle: "Results",
+    resetButton: "Reset to defaults",
+    closeButton: "Close",
+    assumptionLabels: {
+      debtServiceRatio: "Debt Service Ratio (DSR)",
+      annualInterestRate: "Annual Interest Rate",
+      downPaymentRate: "Down Payment Rate",
+      safeBudgetMultiplier: "Safe Budget Multiplier",
+      stretchBudgetMultiplier: "Stretch Budget Multiplier",
+      riskZoneMultiplier: "Risk Zone Multiplier",
     },
   },
 };
