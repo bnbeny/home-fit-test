@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/*
+ * Brand palette — sourced from the provided brand-color sheet.
+ * Gradient: dark navy -> bright blue (hero backgrounds, primary buttons).
+ * Secondary: JM Mint Green / JM Bright Blue / JM Mandarin (status + accents).
+ * `critical` is NOT from the brand sheet — the sheet has no "stop" hue, and a
+ * "Not Ready" status needs one that reads as negative. Picked a standard,
+ * WCAG-checked red rather than reusing mandarin (which is already "caution").
+ */
+@theme {
+  --color-brand-navy: #050b33;
+  --color-brand-navy-light: #0a1157;
+  --color-brand-blue: #2765ff;
+  --color-brand-mint: #00ccbb;
+  --color-brand-mandarin: #f9ac00;
+  --color-brand-critical: #dc2626;
+
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f6f7fb;
+  --color-ink: #0f1430;
+  --color-ink-muted: #5b6178;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+
+/* Hero figure: exactly one per view, per dataviz guidance — proportional
+   (non-tabular) numerals so a large number doesn't look artificially wide. */
+.hero-figure {
+  font-variant-numeric: proportional-nums;
+  font-feature-settings: "pnum" 1;
+}
+
+.tabular-figure {
+  font-variant-numeric: tabular-nums;
+}
