@@ -17,7 +17,7 @@ export function StepIncome({ answers, onUpdate }: StepProps) {
         value={answers.monthlyIncome}
         onChange={(v) => onUpdate({ monthlyIncome: v })}
         min={0}
-        max={300_000}
+        max={1_000_000}
         step={1_000}
         format={formatTHB}
         helperText={t.income.salaryHelp}
@@ -27,8 +27,8 @@ export function StepIncome({ answers, onUpdate }: StepProps) {
         value={answers.bonusAnnual}
         onChange={(v) => onUpdate({ bonusAnnual: v })}
         min={0}
-        max={1_000_000}
-        step={5_000}
+        max={3_000_000}
+        step={1_000}
         format={formatTHB}
         helperText={t.income.bonusHelp}
       />

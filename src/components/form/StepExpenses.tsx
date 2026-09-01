@@ -26,7 +26,7 @@ export function StepExpenses({ answers, onUpdate }: StepProps) {
         value={answers.monthlyLivingExpenses}
         onChange={(v) => onUpdate({ monthlyLivingExpenses: v })}
         min={0}
-        max={100_000}
+        max={200_000}
         step={1_000}
         format={formatTHB}
         helperText={t.expenses.livingExpensesHelp}
@@ -38,8 +38,8 @@ export function StepExpenses({ answers, onUpdate }: StepProps) {
           value={answers.monthlyRent}
           onChange={(v) => onUpdate({ monthlyRent: v })}
           min={0}
-          max={60_000}
-          step={500}
+          max={150_000}
+          step={1_000}
           format={formatTHB}
           helperText={t.expenses.rentHelp}
         />
@@ -50,8 +50,8 @@ export function StepExpenses({ answers, onUpdate }: StepProps) {
         value={answers.annualLumpSumExpenses}
         onChange={(v) => onUpdate({ annualLumpSumExpenses: v })}
         min={0}
-        max={200_000}
-        step={5_000}
+        max={500_000}
+        step={1_000}
         format={formatTHB}
         helperText={t.expenses.annualLumpSumHelp}
       />

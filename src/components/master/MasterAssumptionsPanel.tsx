@@ -51,7 +51,7 @@ export function MasterAssumptionsPanel({
           value={Math.round(assumptions.downPaymentRate * 100)}
           onChange={(v) => onChange({ downPaymentRate: v / 100 })}
           min={0}
-          max={50}
+          max={100}
           step={1}
           format={formatPct}
         />

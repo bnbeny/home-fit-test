@@ -27,8 +27,8 @@ export function StepSavings({ answers, onUpdate }: StepProps) {
           onUpdate(patch);
         }}
         min={0}
-        max={5_000_000}
-        step={10_000}
+        max={20_000_000}
+        step={1_000}
         format={formatTHB}
         helperText={t.savings.totalSavingsHelp}
       />
@@ -38,7 +38,7 @@ export function StepSavings({ answers, onUpdate }: StepProps) {
         onChange={(v) => onUpdate({ availableDownPayment: v })}
         min={0}
         max={answers.totalSavings}
-        step={10_000}
+        step={1_000}
         format={formatTHB}
         helperText={t.savings.downPaymentHelp}
       />
@@ -47,7 +47,7 @@ export function StepSavings({ answers, onUpdate }: StepProps) {
         value={answers.maxComfortableInstallment}
         onChange={(v) => onUpdate({ maxComfortableInstallment: v })}
         min={0}
-        max={100_000}
+        max={200_000}
         step={1_000}
         format={formatTHB}
         helperText={t.savings.maxInstallmentHelp}

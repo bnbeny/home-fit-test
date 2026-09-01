@@ -31,7 +31,7 @@ export function StepHomeGoals({ answers, onUpdate }: StepProps) {
         onChange={(v) => onUpdate({ targetHomePrice: v })}
         min={500_000}
         max={20_000_000}
-        step={50_000}
+        step={1_000}
         format={formatTHB}
       />
       <SliderField
