@@ -17,18 +17,21 @@ interface QuestionnaireFormProps {
   onSubmit: () => void;
 }
 
-const HOME_GOALS_STEP = 5;
+const HOME_GOALS_STEP = 1;
+const INCOME_STEP = 2;
 
 /** A step is valid once its key inputs are non-zero — sliders always have a
  *  value, so this mainly guards against someone racing through with $0
- *  income or a $0 target price, which would make every downstream ratio
+ *  income or a $0 timeline, which would make every downstream ratio
  *  meaningless (division by zero, 0% readiness, etc). */
 function isStepValid(step: number, answers: QuestionnaireAnswers): boolean {
   switch (step) {
-    case 0:
-      return answers.monthlyIncome + answers.bonusAnnual / 12 > 0;
+    case INCOME_STEP:
+      return (
+        answers.primaryIncomeMonthly + answers.additionalIncomeMonthly + answers.bonusAnnual / 12 > 0
+      );
     case HOME_GOALS_STEP:
-      return answers.targetHomePrice > 0 && answers.targetTimelineMonths > 0;
+      return answers.targetTimelineMonths > 0;
     default:
       return true;
   }
@@ -54,12 +57,12 @@ export function QuestionnaireForm({ answers, onUpdate, onSubmit }: Questionnaire
     <Card>
       <StepIndicator steps={stepLabels} currentIndex={step} />
 
-      {step === 0 && <StepIncome answers={answers} onUpdate={onUpdate} />}
-      {step === 1 && <StepDebt answers={answers} onUpdate={onUpdate} />}
-      {step === 2 && <StepExpenses answers={answers} onUpdate={onUpdate} />}
-      {step === 3 && <StepSavings answers={answers} onUpdate={onUpdate} />}
-      {step === 4 && <StepAboutYou answers={answers} onUpdate={onUpdate} />}
+      {step === 0 && <StepAboutYou answers={answers} onUpdate={onUpdate} />}
       {step === HOME_GOALS_STEP && <StepHomeGoals answers={answers} onUpdate={onUpdate} />}
+      {step === INCOME_STEP && <StepIncome answers={answers} onUpdate={onUpdate} />}
+      {step === 3 && <StepDebt answers={answers} onUpdate={onUpdate} />}
+      {step === 4 && <StepExpenses answers={answers} onUpdate={onUpdate} />}
+      {step === 5 && <StepSavings answers={answers} onUpdate={onUpdate} />}
 
       <div className="mt-8 flex items-center justify-between">
         <Button
@@ -76,7 +79,7 @@ export function QuestionnaireForm({ answers, onUpdate, onSubmit }: Questionnaire
       </div>
       {!canAdvance && (
         <p className="mt-3 text-right text-xs text-brand-critical">
-          {step === 0 ? t.form.incomeRequired : t.form.priceRequired}
+          {step === INCOME_STEP ? t.form.incomeRequired : t.form.priceRequired}
         </p>
       )}
     </Card>

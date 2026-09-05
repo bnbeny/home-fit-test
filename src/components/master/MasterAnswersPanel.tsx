@@ -19,12 +19,12 @@ interface MasterAnswersPanelProps {
  *  Back/Next flow, since every Step component is already just a controlled
  *  {answers, onUpdate} block with no internal navigation logic. */
 const STEP_COMPONENTS = [
+  StepAboutYou,
+  StepHomeGoals,
   StepIncome,
   StepDebt,
   StepExpenses,
   StepSavings,
-  StepAboutYou,
-  StepHomeGoals,
 ] as const;
 
 function ChevronIcon({ className }: { className?: string }) {

@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 interface SliderFieldProps {
   label: string;
   value: number;
@@ -8,6 +10,11 @@ interface SliderFieldProps {
   /** Formats the read-only value shown beside the label, e.g. "฿35,000". */
   format?: (value: number) => string;
   helperText?: string;
+  /** Optional control rendered inline right after the label — e.g. a
+   *  compact Monthly/Annual unit toggle for an income field. Purely
+   *  presentational placement; doesn't affect the label's own accessible
+   *  name (still just `label`). */
+  labelAdornment?: ReactNode;
 }
 
 /**
@@ -25,6 +32,7 @@ export function SliderField({
   step = 1,
   format = (v) => v.toLocaleString("en-US"),
   helperText,
+  labelAdornment,
 }: SliderFieldProps) {
   const clampToRange = (raw: number) => {
     if (Number.isNaN(raw)) return min;
@@ -33,8 +41,11 @@ export function SliderField({
 
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <label className="text-sm font-medium text-ink">{label}</label>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-ink">{label}</label>
+          {labelAdornment}
+        </div>
         <input
           type="number"
           inputMode="numeric"

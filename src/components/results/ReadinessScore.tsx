@@ -11,10 +11,9 @@ export function ReadinessScore({ readiness }: ReadinessScoreProps) {
   const { t } = useLanguage();
   const style = STATUS_STYLES[readiness.status];
   const statusLabel = t.results.readiness.statusLabels[readiness.status];
-  const archetypeLabel = t.results.readiness.archetypeLabels[readiness.archetype];
 
   return (
-    <Card eyebrow={t.results.readiness.eyebrow}>
+    <Card title={t.results.readiness.eyebrow}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           {/* Hero figure: the one number this view leads with. */}
@@ -22,7 +21,6 @@ export function ReadinessScore({ readiness }: ReadinessScoreProps) {
             {readiness.readinessPercent}
             <span className="text-2xl font-semibold text-ink-muted">%</span>
           </p>
-          <p className="mt-2 text-sm text-ink-muted">{archetypeLabel}</p>
         </div>
         {/* Status never rides on color alone: icon + label travel with it. */}
         <span

@@ -1,13 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "../ui/Button";
 import { ReadinessScore } from "./ReadinessScore";
 import { PurchasingPower } from "./PurchasingPower";
 import { AdvisoryNotices } from "./AdvisoryNotices";
 import { BuyVsRentComparison } from "./BuyVsRentComparison";
+import { NotesSection } from "./NotesSection";
 import { computeCalculatorResult } from "../../lib/calculations";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { DEFAULT_ASSUMPTIONS } from "../../types/finance";
-import type { CalculationAssumptions, QuestionnaireAnswers } from "../../types/finance";
+import type { CalculationAssumptions, GapPlanScenario, QuestionnaireAnswers } from "../../types/finance";
 
 interface ResultsDashboardProps {
   answers: QuestionnaireAnswers;
@@ -25,9 +26,21 @@ export function ResultsDashboard({
 }: ResultsDashboardProps) {
   const { t } = useLanguage();
 
+  // Recommended Home Price (maxHomePrice) doesn't depend on targetHomePrice,
+  // so it's safe to compute once with the answers as-is to seed the
+  // adjustable Target Home Price control below. The lazy initializer runs
+  // once on mount only, so this re-seeds whenever the user returns to the
+  // results page (this component remounts) rather than tracking every
+  // subsequent answers edit — the form no longer collects a target price to
+  // preserve across visits.
+  const [targetHomePrice, setTargetHomePrice] = useState(() =>
+    Math.round(computeCalculatorResult(answers, assumptions).purchasingPower.maxHomePrice / 1_000) * 1_000,
+  );
+  const [gapPlanScenario, setGapPlanScenario] = useState<GapPlanScenario>("buy");
+
   const result = useMemo(
-    () => computeCalculatorResult(answers, assumptions),
-    [answers, assumptions],
+    () => computeCalculatorResult({ ...answers, targetHomePrice }, assumptions),
+    [answers, targetHomePrice, assumptions],
   );
 
   return (
@@ -43,24 +56,27 @@ export function ResultsDashboard({
         <ReadinessScore readiness={result.readiness} />
         <PurchasingPower
           purchasingPower={result.purchasingPower}
-          targetHomePrice={answers.targetHomePrice}
-          actionPlan={result.actionPlan}
-          applicantAge={answers.applicantAge}
-          maxAgeAtLoanMaturity={assumptions.maxAgeAtLoanMaturity}
-          transactionCostRate={assumptions.transactionCostRate}
-          targetTimelineMonths={answers.targetTimelineMonths}
+          targetHomePrice={targetHomePrice}
+          onTargetHomePriceChange={setTargetHomePrice}
         />
         <AdvisoryNotices notices={result.advisoryNotices} />
         <BuyVsRentComparison
           byBudget={result.buyVsRentByBudget}
           byTarget={result.buyVsRentByTarget}
-          rentalYieldPct={assumptions.rentalYieldPct}
-          rtoPriceMarkupPct={assumptions.rtoPriceMarkupRate}
+          rtoGapPlanByBudget={result.rtoGapPlanByBudget}
+          rtoGapPlanByTarget={result.rtoGapPlanByTarget}
+          rentGapPlanByBudget={result.rentGapPlanByBudget}
+          rentGapPlanByTarget={result.rentGapPlanByTarget}
+          assumptions={assumptions}
           appreciationPct={answers.expectedAppreciationPct}
+          selectedScenario={gapPlanScenario}
+          onSelectScenario={setGapPlanScenario}
+          purchasingPower={result.purchasingPower}
+          availableDownPayment={answers.availableDownPayment}
         />
       </div>
 
-      <p className="text-center text-xs text-ink-muted">{t.results.disclaimer}</p>
+      <NotesSection assumptions={assumptions} appreciationPct={answers.expectedAppreciationPct} />
     </div>
   );
 }

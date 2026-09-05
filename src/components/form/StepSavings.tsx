@@ -42,16 +42,6 @@ export function StepSavings({ answers, onUpdate }: StepProps) {
         format={formatTHB}
         helperText={t.savings.downPaymentHelp}
       />
-      <SliderField
-        label={t.savings.maxInstallment}
-        value={answers.maxComfortableInstallment}
-        onChange={(v) => onUpdate({ maxComfortableInstallment: v })}
-        min={0}
-        max={200_000}
-        step={1_000}
-        format={formatTHB}
-        helperText={t.savings.maxInstallmentHelp}
-      />
     </div>
   );
 }

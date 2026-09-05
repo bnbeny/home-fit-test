@@ -8,17 +8,30 @@ import {
   type BuyVsRentOption,
   type CalculationAssumptions,
   type CalculatorResult,
+  type CapitalValueByScenario,
   type CashFlowBreakdown,
   type CashFlowRiskLevel,
   type PurchasingPowerResult,
   type QuestionnaireAnswers,
   type ReadinessResult,
   type ReadinessStatus,
+  type RentGapPlanResult,
   type RentToOwnResult,
+  type RtoGapPlanResult,
   type WealthComparisonResult,
   type WealthComparisonYear,
   DEFAULT_ASSUMPTIONS,
 } from "../types/finance";
+
+/** Flat tenure assumed for every Buy calculation (installment sizing, loan
+ *  capacity, 10-year wealth comparison) — a fixed policy assumption, not
+ *  derived from the applicant's age. */
+export const BUY_LOAN_TENURE_YEARS = 30;
+
+/** RTO-Payment.xlsx's own natural contract block: the sheet defines RTO
+ *  accumulation month-by-month only through month 36 (see calculateRentToOwn
+ *  and RentToOwnResult.paidTowardPriceAfter3YearsTHB). */
+export const RTO_PERIOD_YEARS = 3;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -60,9 +73,23 @@ export function remainingBalance(
 
 export interface IncomeProfile {
   grossMonthlyIncome: number;
+  /** Primary + additional + co-borrower monthly income — deliberately
+   *  excludes any bonus/variable income, even averaged. This is "Total
+   *  monthly income" for the Financial Snapshot's "Remaining monthly
+   *  income" row (see calculateBuyVsRentCashFlow): a household's annual
+   *  bonus isn't guaranteed recurring monthly cash flow, so it must never
+   *  inflate a figure that's meant to answer "what do I have left every
+   *  month." Co-borrower income is included at the same full weight as the
+   *  applicant's own — see QuestionnaireAnswers.coBorrowerIncomeMonthly. */
+  steadyMonthlyIncome: number;
   /** Income as a lender would count it — bonus/other income discounted by
-   *  variableIncomeWeight, since it isn't guaranteed like salary. */
+   *  variableIncomeWeight, since it isn't guaranteed like salary. Steady
+   *  income (including co-borrower income) is never discounted. */
   bankQualifyingMonthlyIncome: number;
+  /** Applicant's own debt + co-borrower's own debt — kept symmetric with
+   *  steadyMonthlyIncome's inclusion of coBorrowerIncomeMonthly, so counting
+   *  a co-borrower's income never inflates affordability without their debt
+   *  obligations counting against it too. */
   totalMonthlyDebt: number;
 }
 
@@ -70,12 +97,14 @@ export function calculateIncomeProfile(
   answers: QuestionnaireAnswers,
   assumptions: CalculationAssumptions,
 ): IncomeProfile {
+  const steadyMonthlyIncome =
+    answers.primaryIncomeMonthly + answers.additionalIncomeMonthly + answers.coBorrowerIncomeMonthly;
   const variableMonthlyIncome = answers.bonusAnnual / 12;
-  const grossMonthlyIncome = answers.monthlyIncome + variableMonthlyIncome;
+  const grossMonthlyIncome = steadyMonthlyIncome + variableMonthlyIncome;
   const bankQualifyingMonthlyIncome =
-    answers.monthlyIncome + variableMonthlyIncome * assumptions.variableIncomeWeight;
-  const totalMonthlyDebt = answers.homeLoanMonthly + answers.otherDebtMonthly;
-  return { grossMonthlyIncome, bankQualifyingMonthlyIncome, totalMonthlyDebt };
+    steadyMonthlyIncome + variableMonthlyIncome * assumptions.variableIncomeWeight;
+  const totalMonthlyDebt = answers.homeLoanMonthly + answers.otherDebtMonthly + answers.coBorrowerDebtMonthly;
+  return { grossMonthlyIncome, steadyMonthlyIncome, bankQualifyingMonthlyIncome, totalMonthlyDebt };
 }
 
 export interface ExpenseProfile {
@@ -111,28 +140,6 @@ export function resolveExpenseProfile(
     monthlySavingCapacity: Math.max(0, monthlyCashFlowBeforeHousing),
     monthlyCashFlowBeforeHousing,
   };
-}
-
-/** Loan tenure is always auto-calculated from age, never asked for: the
- *  standard bank rule of thumb that age + tenure must not exceed a maximum
- *  age at loan maturity. The loan doesn't originate today, though — it
- *  originates whenever the user actually buys — so `targetTimelineMonths` is
- *  added to the applicant's age first, rounded up to the next whole year
- *  (any partial year still pushes them into the next age bracket by the
- *  time the loan starts, so 1.1 years must be treated as 2, not 1). Always
- *  returns a usable term (floors at minLoanTermYears, caps at
- *  maxLoanTermYearsCap). */
-export function calculateMaxLoanTermYears(
-  applicantAge: number,
-  targetTimelineMonths: number,
-  assumptions: CalculationAssumptions,
-): number {
-  const timelineYears = Math.ceil(targetTimelineMonths / 12);
-  return clamp(
-    assumptions.maxAgeAtLoanMaturity - applicantAge - timelineYears,
-    assumptions.minLoanTermYears,
-    assumptions.maxLoanTermYearsCap,
-  );
 }
 
 export interface InstallmentCeilings {
@@ -196,38 +203,36 @@ export function calculatePurchasingPower(
   const expenses = resolveExpenseProfile(answers, income);
   const ceilings = calculateInstallmentCeilings(answers, assumptions, income, expenses);
 
-  // Tenure is never asked for — always the age-based maximum.
-  const effectiveLoanTermYears = calculateMaxLoanTermYears(
-    answers.applicantAge,
-    answers.targetTimelineMonths,
-    assumptions,
-  );
+  // Tenure is never asked for — always the flat policy assumption.
+  const effectiveLoanTermYears = BUY_LOAN_TENURE_YEARS;
   const factor = loanFactor(effectiveLoanTermYears, assumptions.annualInterestRate);
   const loanCapacity = ceilings.recommendedMonthlyInstallment * factor;
 
-  // Home-price ceiling = loan capacity + whatever cash is available for a
-  // down payment. Purchasing power is deliberately about capacity only —
-  // what income, debt, and available cash support — and does NOT subtract
-  // transaction costs. Those are a closing expense, not a factor in how big
-  // a home you can afford; they're accounted for separately in
-  // calculateActionPlan's requiredCashAtClosing, which is the "do I have
-  // enough cash to close" question.
-  //
-  // Deliberately NOT additionally capped by availableDownPayment / r (the
-  // minimum-equity read of the down payment requirement) — maxHomePrice is
-  // a loan-capacity ceiling, not a "could I close on this today" figure;
-  // whether today's available cash covers the resulting down payment is a
-  // separate question, answered by calculateActionPlan's cashGap, not by
-  // shrinking this ceiling. For the same reason, ฿0 available down payment
-  // is not a special case either — it just means maxHomePrice reduces to
-  // loanCapacity alone (a real, non-zero ceiling whenever income supports
-  // one), rather than forcing the whole figure to 0.
-  const availableForDownPayment = answers.availableDownPayment;
-  const maxHomePrice = Math.max(0, loanCapacity + availableForDownPayment);
+  // Recommended Home Price = the price supported by borrowing/repayment
+  // capacity ALONE, assuming the minimum required down payment
+  // (downPaymentRate) is put down: loanCapacity finances (1-downPaymentRate)
+  // of the price, so price = loanCapacity / (1-downPaymentRate). This is an
+  // affordability ceiling, not a "could I close on this today" figure —
+  // deliberately independent of availableDownPayment. Today's actual cash
+  // doesn't raise this ceiling (extra cash can't make a bank lend above your
+  // DSR/budget capacity) and doesn't lower it either; whether today's real
+  // cash meets the minimum down payment this price implies is a separate
+  // question, answered by calculateActionPlan's remainingDownPayment /
+  // calculateBuyGapNarrative's Down Payment Gap, never by moving this
+  // ceiling. (Previously loanCapacity + availableDownPayment — changed
+  // because that let extra cash silently raise this ceiling, conflating
+  // affordability with today's cash-readiness, which THE GAP's Home Price
+  // Gap / Down Payment Gap split is specifically designed to keep apart.)
+  const maxHomePrice =
+    assumptions.downPaymentRate < 1 ? loanCapacity / (1 - assumptions.downPaymentRate) : 0;
 
-  // Loan actually needed to reach maxHomePrice — can be less than
-  // loanCapacity when available cash, not loan capacity, is what binds.
-  // maxHomePrice = estimatedLoanAmount + availableDownPayment, always.
+  // Loan needed at maxHomePrice using the household's ACTUAL available cash
+  // — not the minimum down payment maxHomePrice's own construction assumes.
+  // Can exceed loanCapacity when available cash falls short of maxHomePrice's
+  // implied minimum (maxHomePrice * downPaymentRate) — that's not a bug, it's
+  // the same cash-shortfall signal remainingDownPayment surfaces separately.
+  // Not currently shown anywhere in the UI.
+  const availableForDownPayment = answers.availableDownPayment;
   const estimatedLoanAmount = Math.max(0, maxHomePrice - availableForDownPayment);
 
   // Budget zones give the user a spending range rather than one brittle
@@ -238,19 +243,18 @@ export function calculatePurchasingPower(
   const stretchBudget = maxHomePrice * assumptions.stretchBudgetMultiplier;
   const riskZoneThreshold = maxHomePrice * assumptions.riskZoneMultiplier;
 
-  const isOverStretchBudget = answers.targetHomePrice > stretchBudget;
-  const overStretchAmount = Math.max(0, answers.targetHomePrice - stretchBudget);
-
-  // "The Gap & The Plan" headline numbers — how far the target price sits
-  // beyond maxHomePrice itself (not the stretch-adjusted zone above), and
-  // the two independent ways to close that gap. Both plan options are exact
-  // because maxHomePrice = loanCapacity + availableDownPayment is additive:
-  // adding priceGap of cash, or enough installment capacity to grow
-  // loanCapacity by priceGap, each close it on their own.
+  // "The Gap & The Plan" headline number — how far the target price sits
+  // beyond maxHomePrice itself (not the stretch-adjusted zone above). Extra
+  // down payment cash no longer closes this on its own (see maxHomePrice's
+  // own comment) — the only lever left is more loan capacity. Since
+  // maxHomePrice = loanCapacity / (1-downPaymentRate), each ฿1 of extra loan
+  // capacity raises maxHomePrice by 1/(1-downPaymentRate), so closing
+  // priceGap needs only priceGap * (1-downPaymentRate) of extra loan
+  // capacity, not priceGap itself.
   const priceGap = Math.max(0, answers.targetHomePrice - maxHomePrice);
   const isPriceGapClosed = priceGap === 0;
-  const additionalDownPaymentNeeded = priceGap;
-  const additionalMonthlyInstallmentNeeded = factor > 0 ? priceGap / factor : 0;
+  const additionalMonthlyInstallmentNeeded =
+    factor > 0 ? (priceGap * (1 - assumptions.downPaymentRate)) / factor : 0;
   const requiredMonthlyInstallmentForTarget =
     ceilings.recommendedMonthlyInstallment + additionalMonthlyInstallmentNeeded;
 
@@ -266,33 +270,46 @@ export function calculatePurchasingPower(
     safeBudget,
     stretchBudget,
     riskZoneThreshold,
-    isOverStretchBudget,
-    overStretchAmount,
     priceGap,
     isPriceGapClosed,
-    additionalDownPaymentNeeded,
     additionalMonthlyInstallmentNeeded,
     requiredMonthlyInstallmentForTarget,
   };
 }
 
+/** Cash due at closing for a Buy at `homePriceBasis`: the minimum down
+ *  payment plus estimated transfer/registration fees. Parameterized on the
+ *  basis (rather than always reading answers.targetHomePrice) so the same
+ *  formula can price Buy's "Initial Payment" row in the Rent/RTO/Buy
+ *  comparison at whatever basis that section is rooted at. */
+export function calculateBuyInitialPayment(
+  homePriceBasis: number,
+  assumptions: CalculationAssumptions,
+): number {
+  return homePriceBasis * assumptions.downPaymentRate + homePriceBasis * assumptions.transactionCostRate;
+}
+
 export function calculateActionPlan(
   answers: QuestionnaireAnswers,
   assumptions: CalculationAssumptions,
-  purchasingPower: PurchasingPowerResult,
   expenses: ExpenseProfile,
 ): ActionPlanResult {
-  const requiredCashAtClosing =
-    answers.targetHomePrice * assumptions.downPaymentRate +
-    answers.targetHomePrice * assumptions.transactionCostRate;
-  const cashGap = Math.max(0, requiredCashAtClosing - answers.availableDownPayment);
-  const isDownPaymentReady = cashGap === 0;
+  // Down payment only — Readiness/downPaymentCoverage and the saving-timeline
+  // math below deliberately track just the down payment, not the full cash
+  // due at closing. Transaction/registration costs are real cash the
+  // household should prepare, but they're a fixed cost of the transaction,
+  // not something saving progress "covers" the way a down payment is — see
+  // transactionCostEstimate, kept for display only.
+  const requiredDownPayment = answers.targetHomePrice * assumptions.downPaymentRate;
+  const remainingDownPayment = Math.max(0, requiredDownPayment - answers.availableDownPayment);
+  const isDownPaymentReady = remainingDownPayment === 0;
+  const transactionCostEstimate = answers.targetHomePrice * assumptions.transactionCostRate;
 
   let monthsToReady: number | null;
   if (isDownPaymentReady) {
     monthsToReady = 0;
   } else if (expenses.monthlySavingCapacity > 0) {
-    monthsToReady = Math.ceil(cashGap / expenses.monthlySavingCapacity);
+    monthsToReady = Math.ceil(remainingDownPayment / expenses.monthlySavingCapacity);
   } else {
     // Saving $0/month against a real gap means "not achievable" — don't
     // divide by zero and don't lie with a number.
@@ -307,55 +324,17 @@ export function calculateActionPlan(
   let suggestedMonthlySavingsIncrease: number | null = null;
   if (monthsToReady !== null && isOnTargetTimeline === false) {
     shortfallMonths = monthsToReady - answers.targetTimelineMonths;
-    const requiredMonthlySavingForTarget = Math.ceil(cashGap / answers.targetTimelineMonths);
+    const requiredMonthlySavingForTarget = Math.ceil(remainingDownPayment / answers.targetTimelineMonths);
     suggestedMonthlySavingsIncrease = Math.max(
       0,
       requiredMonthlySavingForTarget - expenses.monthlySavingCapacity,
     );
   }
 
-  // Keys + raw numbers only — the UI layer renders these in the active
-  // language, since word order and phrasing don't map 1:1 across languages.
-  const alternativeSuggestions: AlternativeSuggestion[] = [];
-
-  if (answers.targetHomePrice > purchasingPower.riskZoneThreshold) {
-    alternativeSuggestions.push({
-      key: "over-risk-budget",
-      amountTHB: purchasingPower.overStretchAmount,
-    });
-  } else if (purchasingPower.isOverStretchBudget) {
-    alternativeSuggestions.push({ key: "stretch-zone" });
-  }
-
-  if (monthsToReady === null && cashGap > 0) {
-    alternativeSuggestions.push({ key: "no-saving-plan" });
-  }
-
-  if (purchasingPower.bindingInstallmentCeiling === "comfort") {
-    alternativeSuggestions.push({ key: "comfort-limited" });
-  }
-
-  // What's left of total savings after everything the purchase actually
-  // consumes (down payment + transaction costs) — the safety net that keeps
-  // a home purchase from wiping the user out. 3 months of (existing debt +
-  // the new mortgage payment) is a standard starter emergency-fund rule of
-  // thumb, not a regulatory figure.
-  const emergencyCushion = Math.max(0, answers.totalSavings - requiredCashAtClosing);
-  const monthlyObligationsAfterPurchase =
-    answers.homeLoanMonthly +
-    answers.otherDebtMonthly +
-    purchasingPower.recommendedMonthlyInstallment;
-  const recommendedCushion = monthlyObligationsAfterPurchase * 3;
-  if (recommendedCushion > 0 && emergencyCushion < recommendedCushion) {
-    alternativeSuggestions.push({
-      key: "low-emergency-cushion",
-      amountTHB: recommendedCushion - emergencyCushion,
-    });
-  }
-
   return {
-    requiredCashAtClosing,
-    cashGap,
+    requiredDownPayment,
+    remainingDownPayment,
+    transactionCostEstimate,
     monthlySavingCapacity: expenses.monthlySavingCapacity,
     isDownPaymentReady,
     monthsToReady,
@@ -363,13 +342,12 @@ export function calculateActionPlan(
     isOnTargetTimeline,
     shortfallMonths,
     suggestedMonthlySavingsIncrease,
-    alternativeSuggestions,
   };
 }
 
 // Readiness sub-score weights — budgetFit weighted heaviest since it's the
 // strongest signal of "can this household's loan capacity actually reach
-// the target price"; closingCashCoverage and timelineFit matter, but
+// the target price"; downPaymentCoverage and timelineFit matter, but
 // shouldn't be able to outvote it. Product judgment call, not a regulatory
 // figure. Previously an equal 1/3 split, which let a fast down-payment
 // saving timeline (timelineFit near 100%) mask a target price the
@@ -379,7 +357,7 @@ export function calculateActionPlan(
 // change in budgetFit flipping the status band), where a heavier weight
 // degrades the score continuously as budgetFit drops.
 const READINESS_BUDGET_FIT_WEIGHT = 0.5;
-const READINESS_CLOSING_CASH_WEIGHT = 0.35;
+const READINESS_DOWN_PAYMENT_WEIGHT = 0.35;
 const READINESS_TIMELINE_FIT_WEIGHT = 0.15;
 
 export function calculateReadiness(
@@ -387,11 +365,15 @@ export function calculateReadiness(
   purchasingPower: PurchasingPowerResult,
   actionPlan: ActionPlanResult,
 ): ReadinessResult {
-  // Three independent lenses on "can they buy this home": can they cover
-  // cash needed at closing today, does their loan capacity reach the price,
-  // and will their saving rate get them there on their own timeline.
-  const closingCashCoverage = actionPlan.requiredCashAtClosing > 0
-    ? clamp((answers.availableDownPayment / actionPlan.requiredCashAtClosing) * 100, 0, 100)
+  // Three independent lenses on "can they buy this home": how much of the
+  // down payment they already have, does their loan capacity reach the
+  // price, and will their saving rate get them the rest on their own
+  // timeline. Deliberately down-payment-only, not full cash-at-closing —
+  // transaction/registration costs are excluded (see
+  // ActionPlanResult.transactionCostEstimate, shown separately in The Gap &
+  // The Plan) so they never dilute this score.
+  const downPaymentCoverage = actionPlan.requiredDownPayment > 0
+    ? clamp((answers.availableDownPayment / actionPlan.requiredDownPayment) * 100, 0, 100)
     : 100;
 
   const budgetFit = answers.targetHomePrice > 0
@@ -413,7 +395,7 @@ export function calculateReadiness(
 
   const readinessPercent = Math.round(
     READINESS_BUDGET_FIT_WEIGHT * budgetFit +
-      READINESS_CLOSING_CASH_WEIGHT * closingCashCoverage +
+      READINESS_DOWN_PAYMENT_WEIGHT * downPaymentCoverage +
       READINESS_TIMELINE_FIT_WEIGHT * timelineFit,
   );
 
@@ -440,7 +422,7 @@ export function calculateReadiness(
     status,
     readinessPercent,
     archetype,
-    subScores: { closingCashCoverage, budgetFit, timelineFit },
+    subScores: { downPaymentCoverage, budgetFit, timelineFit },
   };
 }
 
@@ -462,39 +444,70 @@ export function getAdvisoryNotices(expenses: ExpenseProfile): AdvisoryNotice[] {
   return notices;
 }
 
+/** The "Comfortable" remaining-income threshold used by classifyCushion below. */
+const COMFORTABLE_REMAINING_PCT = 15;
+
 /** Shared cushion thresholds for both sides of the Buy vs Rent cash-flow
  *  comparison: >=15% of income left over is Comfortable, >=5% is Tight,
  *  below that is High Risk. */
 function classifyCushion(remainingPct: number): CashFlowRiskLevel {
-  if (remainingPct >= 15) return "comfortable";
+  if (remainingPct >= COMFORTABLE_REMAINING_PCT) return "comfortable";
   if (remainingPct >= 5) return "moderate";
   return "high-risk";
 }
 
+/** income.steadyMonthlyIncome minus existing debt, living expenses, and
+ *  annualized lump-sum costs — the "other obligations" subtraction
+ *  Remaining Monthly Income uses (see calculateBuyVsRentCashFlow). */
+function calculateIncomeAfterOtherObligations(income: IncomeProfile, expenses: ExpenseProfile): number {
+  const otherObligationsMonthly =
+    income.totalMonthlyDebt + expenses.monthlyLivingExpenses + expenses.monthlyLumpSumEquivalent;
+  return income.steadyMonthlyIncome - otherObligationsMonthly;
+}
+
 /**
  * Rent-to-Own (RTO) figures, reproducing RTO-Payment.xlsx's formulas
- * verbatim — see CalculationAssumptions' rto* fields for the exact source
- * cell each value traces back to. Rooted at `homePriceBasis`, the same basis
- * calculateWealthComparison is called with for Buy and Rent, so all three
- * housing options price the same home (either the suggested home budget or
- * the user's stated target price, depending on which BuyVsRentOption this
- * is for — see BuyVsRentOption).
+ * verbatim for the first RTO_PERIOD_YEARS — see CalculationAssumptions'
+ * rto* fields for the exact source cell each value traces back to — and
+ * then modeling RTO as what it actually is: a 3-year pathway TO
+ * homeownership, not a flat RTO payment that somehow continues forever.
+ * At the end of year 3 the household transitions to a normal mortgage on
+ * whatever the RTO contract hasn't already credited toward the price (see
+ * remainingPrincipalAfter3YearsTHB), using the SAME standard financing
+ * assumption Buy itself uses (BUY_LOAN_TENURE_YEARS, annualInterestRate) —
+ * not a second, RTO-specific one. Rooted at `homePriceBasis`, the same
+ * basis calculateWealthComparison is called with for Buy and Rent, so all
+ * three housing options price the same home (either the suggested home
+ * budget or the user's stated target price, depending on which
+ * BuyVsRentOption this is for — see BuyVsRentOption).
+ *
+ * `marketValueYear10THB` — Buy's own WealthComparisonResult.
+ * affordableHomeValueYear10 for this SAME homePriceBasis and appreciation
+ * assumption — is passed in rather than recomputed here, and used verbatim
+ * as projectedHomeValueYear10THB. This is a deliberate conceptual choice:
+ * the RTO markup (rtoPriceMarkupRate) is the extra cost of acquiring the
+ * home through Rent-to-Own — it inflates rtoPriceTHB (what the household
+ * pays) but must NOT inflate the property's actual market value. The home
+ * is worth what it's worth regardless of how it was financed, so RTO and
+ * Buy must show the identical Year-10 property value for the same home —
+ * see RentToOwnResult.
  */
 export function calculateRentToOwn(
   homePriceBasis: number,
   assumptions: CalculationAssumptions,
+  marketValueYear10THB: number,
 ): RentToOwnResult {
   const rtoPriceTHB = homePriceBasis * (1 + assumptions.rtoPriceMarkupRate);
   const contractFeeTHB = homePriceBasis * assumptions.rtoContractFeeRate;
   const monthlyPaymentTHB = (rtoPriceTHB / 1_000_000) * assumptions.rtoPaymentPerMillion;
 
-  // Months 1-36: RTO-Payment.xlsx's own first "3-year" block (its own
-  // natural, fully-specified milestone — see RentToOwnResult's docstring).
-  // Splits the flat monthly payment into imputed interest (on the
-  // declining balance) and principal (credited toward the price), with the
-  // imputed rate stepping up 1%/year.
+  // Months 1 through RTO_PERIOD_YEARS*12: RTO-Payment.xlsx's own first
+  // "3-year" block (its own natural, fully-specified milestone — see
+  // RentToOwnResult's docstring). Splits the flat monthly payment into
+  // imputed interest (on the declining balance) and principal (credited
+  // toward the price), with the imputed rate stepping up 1%/year.
   let remaining = rtoPriceTHB;
-  for (let month = 1; month <= 36; month++) {
+  for (let month = 1; month <= RTO_PERIOD_YEARS * 12; month++) {
     const rate =
       month <= 12
         ? assumptions.rtoYear1InterestRate
@@ -505,69 +518,146 @@ export function calculateRentToOwn(
     const principal = monthlyPaymentTHB - interest;
     remaining -= principal;
   }
+  const paidTowardPriceAfter3YearsTHB = Math.max(0, rtoPriceTHB - remaining);
+
+  // Transition to normal homeownership at the end of year 3: a standard
+  // mortgage on whatever the RTO contract hasn't already credited toward
+  // the contract/exercise price (rtoPriceTHB) — not the original
+  // homePriceBasis (that would ignore the real markup the household agreed
+  // to pay for the RTO structure) and not a fresh Year-3 market appraisal
+  // (the exercise price is contractually fixed, not renegotiated). Uses the
+  // SAME standard financing assumption as Buy — an ordinary mortgage, not a
+  // second RTO-flavored calculation.
+  const remainingPrincipalAfter3YearsTHB = Math.max(0, rtoPriceTHB - paidTowardPriceAfter3YearsTHB);
+  const transitionLoanFactor = loanFactor(BUY_LOAN_TENURE_YEARS, assumptions.annualInterestRate);
+  const postTransitionMonthlyPaymentTHB =
+    transitionLoanFactor > 0 ? remainingPrincipalAfter3YearsTHB / transitionLoanFactor : 0;
+
+  // Total Paid Over 10 Years = contract fee + 3 years of RTO payments + 7
+  // years of the post-transition mortgage installment — never
+  // monthlyPaymentTHB * 120. The original RTO rate never continues past the
+  // 3-year contract; years 4-10 pay the transition mortgage instead.
+  const rtoMonths = RTO_PERIOD_YEARS * 12;
+  const mortgageMonths = 120 - rtoMonths;
+  const totalPaidOver10YearsTHB =
+    contractFeeTHB + monthlyPaymentTHB * rtoMonths + postTransitionMonthlyPaymentTHB * mortgageMonths;
 
   return {
     rtoPriceTHB,
     contractFeeTHB,
     monthlyPaymentTHB,
-    paidTowardPriceAfter3YearsTHB: Math.max(0, rtoPriceTHB - remaining),
+    paidTowardPriceAfter3YearsTHB,
+    remainingPrincipalAfter3YearsTHB,
+    postTransitionMonthlyPaymentTHB,
+    totalPaidOver10YearsTHB,
+    // The property's market value at year 10 — identical to Buy's, since
+    // market value depends on the home itself, not on the RTO markup paid
+    // to acquire it (see this function's docstring).
+    projectedHomeValueYear10THB: marketValueYear10THB,
   };
 }
 
 /**
  * Rent vs Rent-to-Own vs Buy, one representative month, side by side. All
- * three scenarios share the same income, living expenses, and existing debt
- * — they differ only in the housing line (estimated market rent, the RTO
- * contract's flat monthly payment, or the target home's mortgage
- * installment), so "remaining disposable income" is directly comparable
- * across all three. Uses the same housing figures as calculateWealthComparison
- * (installmentForTargetHome / estimatedMonthlyRent) and calculateRentToOwn
- * so the monthly view and the 10-year wealth view are telling one consistent
- * story about the same target home, not different affordability lenses.
- * "Savings" is intentionally not its own line — subtracting it separately
- * would double-count against the budget ceiling in
- * calculateInstallmentCeilings. The remaining line already represents the
- * residual available for savings & buffer.
+ * three scenarios share the same income/living-expenses/debt — they differ
+ * only in the housing line (estimated market rent, the RTO contract's flat
+ * monthly payment, or the target home's mortgage installment), so "remaining
+ * monthly income" is directly comparable across all three. Uses the same
+ * housing figures as calculateWealthComparison (installmentForTargetHome /
+ * estimatedMonthlyRent) and calculateRentToOwn so the monthly view and the
+ * 10-year wealth view are telling one consistent story about the same
+ * target home, not different affordability lenses.
+ *
+ * remainingMonthly reuses the SAME "income minus other obligations" formula
+ * as InstallmentCeilings.affordableByBudget (steadyMonthlyIncome -
+ * totalMonthlyDebt - monthlyLivingExpenses - monthlyLumpSumEquivalent),
+ * then subtracts this option's own housing payment on top — affordableByBudget
+ * is the budget available FOR housing; remainingMonthly is what's left
+ * AFTER it. Deliberately uses steadyMonthlyIncome, not grossMonthlyIncome:
+ * annual bonus isn't guaranteed recurring monthly cash flow, so it must
+ * never inflate this figure, even averaged.
+ *
+ * Also computes each scenario's one-time Initial Payment (Buy's down
+ * payment + transaction costs via calculateBuyInitialPayment, RTO's contract
+ * fee, or 2 months' rent) and its Total Paid Over 10 Years (see
+ * CashFlowBreakdown.totalPaidOver10YearsTHB) for the side-by-side comparison
+ * grid.
  */
 export function calculateBuyVsRentCashFlow(
+  homePriceBasis: number,
   income: IncomeProfile,
   expenses: ExpenseProfile,
+  assumptions: CalculationAssumptions,
   wealthComparison: WealthComparisonResult,
   rentToOwn: RentToOwnResult,
 ): BuyVsRentCashFlowResult {
-  const livingExpensesMonthly = expenses.monthlyLivingExpenses + expenses.monthlyLumpSumEquivalent;
-  const debtMonthly = income.totalMonthlyDebt;
+  const incomeAfterOtherObligations = calculateIncomeAfterOtherObligations(income, expenses);
 
-  const buildBreakdown = (housingPaymentMonthly: number): CashFlowBreakdown => {
-    const remainingMonthly =
-      income.grossMonthlyIncome - livingExpensesMonthly - debtMonthly - housingPaymentMonthly;
+  const buildBreakdown = (
+    housingPaymentMonthly: number,
+    initialPaymentTHB: number,
+    totalPaidOver10YearsTHB: number,
+  ): CashFlowBreakdown => {
+    const remainingMonthly = incomeAfterOtherObligations - housingPaymentMonthly;
     const remainingPct =
-      income.grossMonthlyIncome > 0 ? (remainingMonthly / income.grossMonthlyIncome) * 100 : 0;
+      income.steadyMonthlyIncome > 0 ? (remainingMonthly / income.steadyMonthlyIncome) * 100 : 0;
     return {
-      incomeMonthly: income.grossMonthlyIncome,
-      livingExpensesMonthly,
-      debtMonthly,
+      incomeMonthly: income.steadyMonthlyIncome,
       housingPaymentMonthly,
       remainingMonthly,
       remainingPct,
       cushionStatus: classifyCushion(remainingPct),
+      initialPaymentTHB,
+      totalPaidOver10YearsTHB,
     };
   };
 
+  const buyInitialPayment = calculateBuyInitialPayment(homePriceBasis, assumptions);
+  // Rent's own initial payment (2 months') is a refundable deposit plus a
+  // prepaid month already counted in the 120-month rent total below, not an
+  // additional cost — so it's excluded here, unlike Buy/RTO's real one-time
+  // fees, which are added on top of their own totals.
+  const rentInitialPayment = wealthComparison.estimatedMonthlyRent * 2;
+  // Year-10 entry of the wealth projection's own cumulative total — rent
+  // grows with the property's appreciation there (see
+  // calculateWealthComparison), so this must be read from that projection
+  // rather than re-derived here as a flat estimatedMonthlyRent * 120, which
+  // would silently understate what renting this same appreciating property
+  // actually costs over 10 years.
+  const totalRentPaidOver10Years = wealthComparison.years[wealthComparison.years.length - 1].totalRentPaid;
+
   return {
-    buy: buildBreakdown(wealthComparison.installmentForTargetHome),
-    rent: buildBreakdown(wealthComparison.estimatedMonthlyRent),
-    rentToOwn: buildBreakdown(rentToOwn.monthlyPaymentTHB),
+    buy: buildBreakdown(
+      wealthComparison.installmentForTargetHome,
+      buyInitialPayment,
+      wealthComparison.installmentForTargetHome * 120 + buyInitialPayment,
+    ),
+    rent: buildBreakdown(wealthComparison.estimatedMonthlyRent, rentInitialPayment, totalRentPaidOver10Years),
+    // RTO's own totalPaidOver10YearsTHB already accounts for the 3-year RTO
+    // phase followed by 7 years on the post-transition mortgage — never
+    // monthlyPaymentTHB * 120 (see calculateRentToOwn).
+    rentToOwn: buildBreakdown(rentToOwn.monthlyPaymentTHB, rentToOwn.contractFeeTHB, rentToOwn.totalPaidOver10YearsTHB),
+  };
+}
+
+/** Capital Value data for the comparison grid — Buy and RTO both project to
+ *  the SAME year-10 horizon (see RentToOwnResult.projectedHomeValueYear10THB
+ *  for how RTO gets there despite its own contract math stopping at year 3). */
+export function calculateCapitalValue(
+  wealthComparison: WealthComparisonResult,
+  rentToOwn: RentToOwnResult,
+): CapitalValueByScenario {
+  return {
+    buy: { accumulates: true, amountTHB: wealthComparison.affordableHomeValueYear10 },
+    rent: { accumulates: false },
+    rentToOwn: { accumulates: true, amountTHB: rentToOwn.projectedHomeValueYear10THB },
   };
 }
 
 /**
- * Buy vs Rent over 10 years, rooted at `homePriceBasis` — either the
- * suggested home budget (purchasingPower.maxHomePrice) or the user's stated
- * target home price, depending on which BuyVsRentOption this is computing
- * (see computeCalculatorResult, which calls this twice, once per basis, so
- * the whole Buy vs Rent section can be viewed either way). Tracks each
- * scenario's actual housing outcome only:
+ * Buy vs Rent over 10 years, rooted at `homePriceBasis` — the user's
+ * adjustable Target Home Price (see BuyVsRentOption). Tracks each scenario's
+ * actual housing outcome only:
  *   - Buy: home equity (home value minus remaining loan balance) — a real,
  *     owned asset.
  *   - Rent: no housing asset accumulates, ever — renting a home builds no
@@ -579,33 +669,45 @@ export function calculateBuyVsRentCashFlow(
  *     answers. Do not call this "net wealth": it is housing-asset value
  *     only, not a household's total net worth.
  *
- * `downPaymentAmount` is an explicit THB amount — always the user's actual
- * available down payment (answers.availableDownPayment), for both basis
- * prices, never a generic downPaymentRate-of-price figure. This keeps every
- * "Buy" installment in the app anchored to the same real cash contribution:
- * at the suggested home budget, maxHomePrice was itself built as
- * loanCapacity + this exact amount, so reusing it here keeps this
- * installment equal to purchasingPower.recommendedMonthlyInstallment; at
- * the user's stated target price, it keeps this installment equal to
- * PurchasingPowerResult.requiredMonthlyInstallmentForTarget (The Gap & The
- * Plan's "Option 2" total) — both are provably the same formula,
- * (homePriceBasis - availableDownPayment) / loanFactor, algebraically.
+ * The modeled loan is ALWAYS sized off the assumed minimum required down
+ * payment (homePriceBasis * downPaymentRate) — the same standard financing
+ * assumption for BOTH the Recommended-price and Target-price scenarios (see
+ * computeCalculatorResult), never the household's real
+ * answers.availableDownPayment. This is what makes loanForTargetHome exactly
+ * equal purchasingPower.loanCapacity when homePriceBasis = maxHomePrice
+ * (matching maxHomePrice's own construction), and what keeps Buy's modeled
+ * installment a pure function of price + standard assumptions at ANY basis,
+ * never silently different between the two scenarios shown side by side on
+ * the same page. Whether the household's REAL cash actually covers this
+ * minimum is a deliberately separate question — the Down Payment Gap
+ * (ActionPlanResult.remainingDownPayment / BuyGapNarrative.remainingDownPayment),
+ * which still compares requiredDownPayment against real availableDownPayment,
+ * just never feeds into this loan/installment math.
+ * `loanTermYears` is always BUY_LOAN_TENURE_YEARS at every call site.
  */
 export function calculateWealthComparison(
   homePriceBasis: number,
-  downPaymentAmount: number,
   assumptions: CalculationAssumptions,
   loanTermYears: number,
   appreciationPct: number,
 ): WealthComparisonResult {
-  const loanForTargetHome = Math.max(0, homePriceBasis - downPaymentAmount);
+  const requiredDownPayment = homePriceBasis * assumptions.downPaymentRate;
+  const loanForTargetHome = Math.max(0, homePriceBasis - requiredDownPayment);
   const factor = loanFactor(loanTermYears, assumptions.annualInterestRate);
   const installmentForTargetHome = factor > 0 ? loanForTargetHome / factor : 0;
 
+  // "Today" / start-of-comparison estimate — this is what the UI's Monthly
+  // Payment / Estimated Monthly Rent figure shows, and it stays this fixed
+  // snapshot even though the year-by-year projection below grows rent
+  // alongside the property's own appreciation (see totalRentPaid): rentalYieldPct
+  // is a constant fraction of property value, so if the property's value is
+  // modeled as appreciating, the market rent that yield is a fraction OF must
+  // rise with it too, not stay flat for 10 years while the value under it grows.
   const estimatedMonthlyRent = (homePriceBasis * assumptions.rentalYieldPct) / 12;
   const loanTermMonths = loanTermYears * 12;
 
   const years: WealthComparisonYear[] = [];
+  let cumulativeRentPaid = 0;
   for (let year = 1; year <= 10; year++) {
     const months = year * 12;
     const homeValue = homePriceBasis * Math.pow(1 + appreciationPct, year);
@@ -620,7 +722,16 @@ export function calculateWealthComparison(
     // year 10) — without this cap a short term kept accruing phantom
     // installments for years the loan no longer existed.
     const totalMortgagePaid = installmentForTargetHome * Math.min(months, loanTermMonths);
-    const totalRentPaid = estimatedMonthlyRent * months;
+    // Rent during this year tracks the property's value as of the START of
+    // the year (appreciationPct^(year-1)) at the same constant
+    // rentalYieldPct — a "step" growth model matching this function's own
+    // annual resolution elsewhere (homeValue/loanBalance are also computed
+    // once per year, not monthly). Year 1 uses homePriceBasis itself
+    // un-appreciated, so its total matches 12 * estimatedMonthlyRent exactly.
+    const annualRentThisYear =
+      homePriceBasis * Math.pow(1 + appreciationPct, year - 1) * assumptions.rentalYieldPct;
+    cumulativeRentPaid += annualRentThisYear;
+    const totalRentPaid = cumulativeRentPaid;
 
     years.push({ year, homeValue, loanBalance, homeEquity, totalMortgagePaid, totalRentPaid });
   }
@@ -636,13 +747,10 @@ export function calculateWealthComparison(
   };
 }
 
-/** Computes one full BuyVsRentOption (wealth comparison + RTO + monthly
- *  cash flow) for a single home price basis — see BuyVsRentOption's and
- *  calculateWealthComparison's docstrings for why this runs twice, once per
- *  basis, each with its own downPaymentAmount. */
+/** Computes the full BuyVsRentOption (wealth comparison + RTO + monthly cash
+ *  flow + capital value) rooted at the user's Target Home Price. */
 function buildBuyVsRentOption(
   homePriceBasis: number,
-  downPaymentAmount: number,
   assumptions: CalculationAssumptions,
   loanTermYears: number,
   appreciationPct: number,
@@ -651,14 +759,176 @@ function buildBuyVsRentOption(
 ): BuyVsRentOption {
   const wealthComparison = calculateWealthComparison(
     homePriceBasis,
-    downPaymentAmount,
     assumptions,
     loanTermYears,
     appreciationPct,
   );
-  const rentToOwn = calculateRentToOwn(homePriceBasis, assumptions);
-  const cashFlow = calculateBuyVsRentCashFlow(income, expenses, wealthComparison, rentToOwn);
-  return { homePriceBasis, wealthComparison, rentToOwn, cashFlow };
+  const rentToOwn = calculateRentToOwn(homePriceBasis, assumptions, wealthComparison.affordableHomeValueYear10);
+  const cashFlow = calculateBuyVsRentCashFlow(
+    homePriceBasis,
+    income,
+    expenses,
+    assumptions,
+    wealthComparison,
+    rentToOwn,
+  );
+  const capitalValue = calculateCapitalValue(wealthComparison, rentToOwn);
+  return { homePriceBasis, wealthComparison, rentToOwn, cashFlow, capitalValue };
+}
+
+/** RTO's Gap & Plan lens — see RtoGapPlanResult.
+ *
+ *  Deliberately does NOT compute its own RTO-specific "affordable home
+ *  price": Buy and RTO share one financial-eligibility ceiling
+ *  (PurchasingPowerResult.maxHomePrice, the same Recommended Home Price
+ *  shown for Buy), so "does this price fit my finances" is answered once,
+ *  by calculateBuyGapNarrative, and reused for both — see BuyContent and
+ *  RtoContent in GapAndPlan.tsx, which both call it with the same
+ *  homePriceBasis. This function is scoped to what's genuinely
+ *  RTO-specific: the contract fee (an upfront cash requirement Buy doesn't
+ *  have) and the RTO monthly payment's own cash-flow cushion (RTO's payment
+ *  mechanics — see calculateRentToOwn — are not a bank loan, so they're
+ *  never run through Buy's DSR/installment math). RtoContent surfaces
+ *  hasMonthlyShortfall/monthlyShortfallTHB as their own GAP/PLAN row — RTO's
+ *  Years 1-3 payment-feasibility check — kept entirely separate from the
+ *  shared Home Price Gap row above. */
+export function calculateRtoGapPlan(
+  answers: QuestionnaireAnswers,
+  expenses: ExpenseProfile,
+  rentToOwn: RentToOwnResult,
+  rentToOwnCashFlow: CashFlowBreakdown,
+): RtoGapPlanResult {
+  const requiredRtoContractFee = rentToOwn.contractFeeTHB;
+  const rtoContractFeeGap = Math.max(0, requiredRtoContractFee - answers.availableDownPayment);
+  const isContractFeeGapClosed = rtoContractFeeGap === 0;
+  const monthsToCloseContractFeeGap = isContractFeeGapClosed
+    ? 0
+    : expenses.monthlySavingCapacity > 0
+      ? Math.ceil(rtoContractFeeGap / expenses.monthlySavingCapacity)
+      : null;
+  const hasMonthlyShortfall = rentToOwnCashFlow.remainingMonthly < 0;
+
+  return {
+    requiredRtoContractFee,
+    availableDownPaymentTHB: answers.availableDownPayment,
+    rtoContractFeeGap,
+    isContractFeeGapClosed,
+    monthsToCloseContractFeeGap,
+    hasMonthlyShortfall,
+    monthlyShortfallTHB: hasMonthlyShortfall ? Math.abs(rentToOwnCashFlow.remainingMonthly) : 0,
+    monthlyPaymentTHB: rentToOwn.monthlyPaymentTHB,
+    cushionStatus: rentToOwnCashFlow.cushionStatus,
+    remainingMonthlyTHB: rentToOwnCashFlow.remainingMonthly,
+  };
+}
+
+/** Rent's Gap & Plan lens — see RentGapPlanResult. */
+export function calculateRentGapPlan(
+  rentCashFlow: CashFlowBreakdown,
+  answers: QuestionnaireAnswers,
+  expenses: ExpenseProfile,
+): RentGapPlanResult {
+  const hasMonthlyShortfall = rentCashFlow.remainingMonthly < 0;
+
+  // Upfront cash requirement — the 2-month deposit, not a monthly cost (see
+  // RentGapPlanResult). rentCashFlow.initialPaymentTHB is already exactly
+  // this figure (estimatedMonthlyRent * 2), computed once in
+  // calculateBuyVsRentCashFlow and reused here rather than recomputed.
+  const requiredRentalDeposit = rentCashFlow.initialPaymentTHB;
+  const rentalDepositGap = Math.max(0, requiredRentalDeposit - answers.totalSavings);
+  const isRentalDepositReady = rentalDepositGap === 0;
+  const monthsToCloseRentalDepositGap = isRentalDepositReady
+    ? 0
+    : expenses.monthlySavingCapacity > 0
+      ? Math.ceil(rentalDepositGap / expenses.monthlySavingCapacity)
+      : null;
+
+  return {
+    hasMonthlyShortfall,
+    monthlyShortfallTHB: hasMonthlyShortfall ? Math.abs(rentCashFlow.remainingMonthly) : 0,
+    requiredRentalDeposit,
+    rentalDepositGap,
+    isRentalDepositReady,
+    monthsToCloseRentalDepositGap,
+  };
+}
+
+/** Buy's Gap & Plan lens, generalized to whatever home price basis the Buy
+ *  vs Rent section's toggle currently shows (Recommended Home Price or the
+ *  user's Target Home Price) — unlike PurchasingPowerResult's own
+ *  priceGap/etc. fields, which are always rooted at the user's live target
+ *  regardless of that toggle. purchasingPower's other fields (maxHomePrice,
+ *  loanCapacity, stretchBudget, riskZoneThreshold, ...) don't depend on any
+ *  home price basis, so this can be recomputed for either basis on the fly
+ *  from the same purchasingPower object. */
+export interface BuyGapNarrative {
+  priceGap: number;
+  isPriceGapClosed: boolean;
+  /** The ONLY lever that closes priceGap — see PurchasingPowerResult's
+   *  matching field: more loan capacity, not more down payment cash (which
+   *  no longer moves maxHomePrice at all — see maxHomePrice's own comment).
+   *  NOT priceGap/loanFactor: accounts for maxHomePrice's
+   *  loanCapacity/(1-downPaymentRate) construction. */
+  additionalMonthlyInstallmentNeeded: number;
+  requiredMonthlyInstallmentForTarget: number;
+  /** Present when homePriceBasis sits above the stretch or risk zone —
+   *  same trigger as calculateActionPlan's over-risk-budget/stretch-zone
+   *  suggestion, generalized to any basis price. */
+  downsizeSuggestion?: AlternativeSuggestion;
+  /** Down payment readiness at homePriceBasis — the same down-payment-only
+   *  framing as ActionPlanResult (see calculateActionPlan), just generalized
+   *  to whichever basis price is selected instead of always
+   *  answers.targetHomePrice. This is the cash-readiness question — distinct
+   *  from priceGap above, which is the loan-eligibility question. The two
+   *  are deliberately independent now: closing one never closes the other. */
+  requiredDownPayment: number;
+  /** max(requiredDownPayment - availableDownPayment, 0). */
+  remainingDownPayment: number;
+  /** Estimated transfer + mortgage-registration fees at homePriceBasis —
+   *  additional cash to prepare on top of the down payment, shown for
+   *  planning only. Never subtracted from requiredDownPayment/
+   *  remainingDownPayment above. */
+  transactionCostEstimate: number;
+}
+
+export function calculateBuyGapNarrative(
+  homePriceBasis: number,
+  purchasingPower: PurchasingPowerResult,
+  assumptions: CalculationAssumptions,
+  availableDownPayment: number,
+): BuyGapNarrative {
+  const factor = loanFactor(purchasingPower.effectiveLoanTermYears, assumptions.annualInterestRate);
+  const priceGap = Math.max(0, homePriceBasis - purchasingPower.maxHomePrice);
+  const isPriceGapClosed = priceGap === 0;
+  const additionalMonthlyInstallmentNeeded =
+    factor > 0 ? (priceGap * (1 - assumptions.downPaymentRate)) / factor : 0;
+  const requiredMonthlyInstallmentForTarget =
+    purchasingPower.recommendedMonthlyInstallment + additionalMonthlyInstallmentNeeded;
+
+  const requiredDownPayment = homePriceBasis * assumptions.downPaymentRate;
+  const remainingDownPayment = Math.max(0, requiredDownPayment - availableDownPayment);
+  const transactionCostEstimate = homePriceBasis * assumptions.transactionCostRate;
+
+  let downsizeSuggestion: AlternativeSuggestion | undefined;
+  if (homePriceBasis > purchasingPower.riskZoneThreshold) {
+    downsizeSuggestion = {
+      key: "over-risk-budget",
+      amountTHB: Math.max(0, homePriceBasis - purchasingPower.stretchBudget),
+    };
+  } else if (homePriceBasis > purchasingPower.stretchBudget) {
+    downsizeSuggestion = { key: "stretch-zone" };
+  }
+
+  return {
+    priceGap,
+    isPriceGapClosed,
+    additionalMonthlyInstallmentNeeded,
+    requiredMonthlyInstallmentForTarget,
+    downsizeSuggestion,
+    requiredDownPayment,
+    remainingDownPayment,
+    transactionCostEstimate,
+  };
 }
 
 export function computeCalculatorResult(
@@ -668,17 +938,26 @@ export function computeCalculatorResult(
   const income = calculateIncomeProfile(answers, assumptions);
   const expenses = resolveExpenseProfile(answers, income);
   const purchasingPower = calculatePurchasingPower(answers, assumptions);
-  const actionPlan = calculateActionPlan(answers, assumptions, purchasingPower, expenses);
+  const actionPlan = calculateActionPlan(answers, assumptions, expenses);
   const readiness = calculateReadiness(answers, purchasingPower, actionPlan);
   const advisoryNotices = getAdvisoryNotices(expenses);
 
-  // Both bases use the SAME real down payment amount — see
-  // calculateWealthComparison's docstring for why this is what keeps every
-  // "Buy" installment in the app (this section, Purchasing Power, and The
-  // Gap & The Plan) telling one consistent story instead of three.
+  // Both bases model Buy's loan/installment the SAME way — the standard
+  // financing assumption of a minimum-required down payment
+  // (homePriceBasis * downPaymentRate), computed inside
+  // calculateWealthComparison itself — never the household's real
+  // answers.availableDownPayment. This is what makes byBudget's
+  // loanForTargetHome exactly equal purchasingPower.loanCapacity (by
+  // construction, since maxHomePrice = loanCapacity / (1-downPaymentRate)),
+  // and what keeps byBudget and byTarget's modeled Buy figures consistent
+  // with each other and with Purchasing Power, rather than one using real
+  // cash and the other an assumption. The household's REAL cash still
+  // matters — it's compared against this same requiredDownPayment
+  // separately, as the Down Payment Gap (ActionPlanResult.remainingDownPayment
+  // / BuyGapNarrative.remainingDownPayment) — just never inside this
+  // loan/installment math.
   const buyVsRentByBudget = buildBuyVsRentOption(
     purchasingPower.maxHomePrice,
-    answers.availableDownPayment,
     assumptions,
     purchasingPower.effectiveLoanTermYears,
     answers.expectedAppreciationPct,
@@ -687,13 +966,31 @@ export function computeCalculatorResult(
   );
   const buyVsRentByTarget = buildBuyVsRentOption(
     answers.targetHomePrice,
-    answers.availableDownPayment,
     assumptions,
     purchasingPower.effectiveLoanTermYears,
     answers.expectedAppreciationPct,
     income,
     expenses,
   );
+
+  // RTO/Rent Gap & Plan computed for BOTH bases — like buyVsRentByBudget/
+  // ByTarget, so the Buy vs Rent section's basis toggle can drive Gap &
+  // Plan's RTO/Rent tabs too (see GapAndPlan, which reads whichever pair
+  // BuyVsRentComparison's toggle currently selects).
+  const rtoGapPlanByBudget = calculateRtoGapPlan(
+    answers,
+    expenses,
+    buyVsRentByBudget.rentToOwn,
+    buyVsRentByBudget.cashFlow.rentToOwn,
+  );
+  const rtoGapPlanByTarget = calculateRtoGapPlan(
+    answers,
+    expenses,
+    buyVsRentByTarget.rentToOwn,
+    buyVsRentByTarget.cashFlow.rentToOwn,
+  );
+  const rentGapPlanByBudget = calculateRentGapPlan(buyVsRentByBudget.cashFlow.rent, answers, expenses);
+  const rentGapPlanByTarget = calculateRentGapPlan(buyVsRentByTarget.cashFlow.rent, answers, expenses);
 
   return {
     purchasingPower,
@@ -702,6 +999,10 @@ export function computeCalculatorResult(
     advisoryNotices,
     buyVsRentByBudget,
     buyVsRentByTarget,
+    rtoGapPlanByBudget,
+    rtoGapPlanByTarget,
+    rentGapPlanByBudget,
+    rentGapPlanByTarget,
   };
 }
 

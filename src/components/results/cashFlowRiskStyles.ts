@@ -1,10 +1,12 @@
 import type { CashFlowRiskLevel } from "../../types/finance";
 
 /**
- * Same mint/mandarin/critical traffic light as statusStyles.ts, kept in a
- * separate file since CashFlowRiskLevel and ReadinessStatus are different
- * domains (monthly cash-flow risk vs. overall buy-readiness) even though
- * they share the same 3-step color language and never-color-alone rule.
+ * Same mint/mandarin/critical traffic light as statusStyles.ts. This status
+ * now appears in exactly ONE place — the small dot-tag on the "Remaining
+ * monthly income" row (see CushionTag in BuyVsRentComparison.tsx) — not
+ * duplicated as a separate header badge, so there's no risk of it reading
+ * as a second, competing verdict next to BudgetZoneBar's Safe/Stretch/Risk
+ * colors elsewhere on the page.
  */
 export const CASH_FLOW_RISK_STYLES: Record<
   CashFlowRiskLevel,

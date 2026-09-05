@@ -32,6 +32,25 @@ export function StepDebt({ answers, onUpdate }: StepProps) {
         format={formatTHB}
         helperText={t.debt.otherDebtHelp}
       />
+
+      {/* Set off by a divider — same treatment as StepIncome's co-borrower
+          section: a co-borrower's debt is a different person's obligation,
+          not another "your own debt" field. */}
+      <div className="border-t border-black/10 pt-6">
+        <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+          {t.debt.coBorrowerSectionLabel}
+        </p>
+        <SliderField
+          label={t.debt.coBorrowerDebt}
+          value={answers.coBorrowerDebtMonthly}
+          onChange={(v) => onUpdate({ coBorrowerDebtMonthly: v })}
+          min={0}
+          max={150_000}
+          step={1_000}
+          format={formatTHB}
+          helperText={t.debt.coBorrowerDebtHelp}
+        />
+      </div>
     </div>
   );
 }

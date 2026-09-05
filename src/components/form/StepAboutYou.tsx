@@ -11,8 +11,22 @@ interface StepProps {
 export function StepAboutYou({ answers, onUpdate }: StepProps) {
   const { t } = useLanguage();
   const employmentOptions: { value: EmploymentType; label: string }[] = [
-    { value: "salaried", label: t.aboutYou.employmentTypeOptions.salaried },
+    {
+      value: "government-state-enterprise",
+      label: t.aboutYou.employmentTypeOptions["government-state-enterprise"],
+    },
+    { value: "permanent", label: t.aboutYou.employmentTypeOptions.permanent },
+    {
+      value: "contract-temporary",
+      label: t.aboutYou.employmentTypeOptions["contract-temporary"],
+    },
     { value: "business-owner", label: t.aboutYou.employmentTypeOptions["business-owner"] },
+    {
+      value: "self-employed-freelancer",
+      label: t.aboutYou.employmentTypeOptions["self-employed-freelancer"],
+    },
+    { value: "gig-commission", label: t.aboutYou.employmentTypeOptions["gig-commission"] },
+    { value: "unemployed", label: t.aboutYou.employmentTypeOptions.unemployed },
   ];
 
   return (

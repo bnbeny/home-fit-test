@@ -1,32 +1,69 @@
-import { useId, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode, SVGProps } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { Card } from "../ui/Card";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { GapAndPlan } from "./GapAndPlan";
 import { CASH_FLOW_RISK_STYLES } from "./cashFlowRiskStyles";
 import { formatPercent, formatTHB } from "../../lib/calculations";
 import { useLanguage } from "../../i18n/LanguageContext";
-import type { BuyVsRentOption, CashFlowBreakdown } from "../../types/finance";
+import type {
+  BuyVsRentOption,
+  CalculationAssumptions,
+  CapitalValueResult,
+  CashFlowBreakdown,
+  CashFlowRiskLevel,
+  GapPlanScenario,
+  PurchasingPowerResult,
+  RentGapPlanResult,
+  RtoGapPlanResult,
+} from "../../types/finance";
 import type { Translations } from "../../i18n/types";
 
+type HomePriceBasisKey = "budget" | "target";
+
 interface BuyVsRentComparisonProps {
-  /** Every number in this section recomputed for the suggested home budget
-   *  (purchasingPower.maxHomePrice) as the basis price. */
+  /** Every number in this section, including Gap & Plan below, is
+   *  recomputed for whichever basis the toggle selects — see
+   *  BuyVsRentOption. RTO/Rent's Gap & Plan lenses need their own
+   *  ByBudget/ByTarget pair (rtoGapPlanByBudget etc.) since they aren't
+   *  derivable on the fly the way Buy's is (see calculateBuyGapNarrative). */
   byBudget: BuyVsRentOption;
-  /** Same, but for the user's stated target home price as the basis. */
   byTarget: BuyVsRentOption;
-  rentalYieldPct: number;
-  /** Markup the RTO contract price carries over the basis home price — a
-   *  fixed policy constant (CalculationAssumptions.rtoPriceMarkupRate,
-   *  sourced from RTO-Payment.xlsx), not user-derived, so it's passed
-   *  through directly the same way rentalYieldPct already is. */
-  rtoPriceMarkupPct: number;
+  rtoGapPlanByBudget: RtoGapPlanResult;
+  rtoGapPlanByTarget: RtoGapPlanResult;
+  rentGapPlanByBudget: RentGapPlanResult;
+  rentGapPlanByTarget: RentGapPlanResult;
+  assumptions: CalculationAssumptions;
   appreciationPct: number;
+  /** Which card is selected — drives the Gap & Plan section rendered below
+   *  the three cards, in this same component (see ResultsDashboard, which
+   *  owns this state). */
+  selectedScenario: GapPlanScenario;
+  onSelectScenario: (scenario: GapPlanScenario) => void;
+  /** Passed straight through to GapAndPlan. */
+  purchasingPower: PurchasingPowerResult;
+  /** Passed straight through to GapAndPlan's Buy down-payment-status card. */
+  availableDownPayment: number;
 }
 
 type ScenarioKey = "rent" | "rentToOwn" | "buy";
-type HomePriceBasisKey = "budget" | "target";
+
+/** This component's own key naming (matching CashFlowBreakdown/
+ *  CapitalValueByScenario's "rentToOwn") vs. GapPlanScenario's "rto" —
+ *  translates between the two rather than renaming either data shape. */
+const SCENARIO_TO_GAP_PLAN: Record<ScenarioKey, GapPlanScenario> = {
+  rent: "rent",
+  rentToOwn: "rto",
+  buy: "buy",
+};
 
 const SECTION_LABEL_CLASS = "text-xs font-semibold uppercase tracking-wide text-ink-muted";
+
+const SCENARIO_ACCENT_CLASS: Record<ScenarioKey, string> = {
+  rent: "border-t-brand-mint",
+  rentToOwn: "border-t-brand-mandarin",
+  buy: "border-t-brand-blue",
+};
 
 function ArrowRightIcon({ className }: { className?: string }) {
   return (
@@ -37,384 +74,363 @@ function ArrowRightIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronIcon({ direction, className }: { direction: "left" | "right"; className?: string }) {
+function TapIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d={direction === "left" ? "M12.5 5l-5 5 5 5" : "M7.5 5l5 5-5 5"} />
+    <svg viewBox="0 0 20 20" fill="currentColor" stroke="none" className={className} aria-hidden="true">
+      <path d="M5 3.5a.5.5 0 0 1 .82-.38l9 7a.5.5 0 0 1-.22.88l-3.9.72 2.1 4.06a.5.5 0 0 1-.22.67l-1.3.66a.5.5 0 0 1-.67-.22l-2.06-4-2.75 2.9a.5.5 0 0 1-.86-.35V3.5z" />
     </svg>
   );
 }
 
-const SCENARIO_ACCENT_CLASS: Record<ScenarioKey, string> = {
-  rent: "border-t-brand-mint",
-  rentToOwn: "border-t-brand-mandarin",
-  buy: "border-t-brand-blue",
-};
-
-function CoinIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M9.5 15.2c.5.6 1.4 1 2.5 1 1.8 0 3-.9 3-2s-1.2-1.6-3-2-3-.9-3-2 1.2-2 3-2c1.1 0 2 .4 2.5 1" />
-      <path d="M12 6.5v1M12 16.5v1" />
-    </svg>
-  );
-}
-
-function HomeIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-      <path d="M4 11.5 12 4l8 7.5" />
-      <path d="M6 10v9a1 1 0 0 0 1 1h3.5v-5.5h3V20H17a1 1 0 0 0 1-1v-9" />
-    </svg>
-  );
-}
-
-function CartIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-      <path d="M3.5 4.5h2l2 11.5h10l1.6-7.5H6.2" />
-      <circle cx="9.5" cy="19" r="1.3" />
-      <circle cx="16" cy="19" r="1.3" />
-    </svg>
-  );
-}
-
-function CardIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-      <rect x="3" y="6" width="18" height="12" rx="2" />
-      <path d="M3 10h18" />
-      <path d="M6.5 14.2h3" />
-    </svg>
-  );
-}
-
-function IconBadge({ tone, children }: { tone: "accent" | "neutral"; children: ReactNode }) {
-  const toneClass = tone === "accent" ? "bg-brand-blue/10 text-brand-blue" : "bg-black/5 text-ink-muted";
-  return (
-    <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full ${toneClass}`} aria-hidden="true">
-      {children}
-    </span>
-  );
-}
-
-function OutflowTile({
-  icon: Icon,
+function MetricRow({
   label,
+  tooltip,
   value,
+  caption,
+  statusBadge,
+  className = "",
 }: {
-  icon: (props: SVGProps<SVGSVGElement>) => ReactNode;
   label: string;
+  tooltip?: string;
   value: string;
+  caption?: string;
+  statusBadge?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="rounded-2xl bg-surface p-4 text-center ring-1 ring-black/5">
-      <IconBadge tone="neutral">
-        <Icon className="h-5 w-5" />
-      </IconBadge>
-      <p className="mt-2 text-xs font-medium text-ink-muted">{label}</p>
-      <p className="hero-figure mt-0.5 text-lg font-bold text-ink">{value}</p>
+    <div className={`flex items-baseline justify-between gap-3 border-b border-black/5 py-2 last:border-b-0 ${className}`}>
+      <span className="flex items-center gap-1 text-xs text-ink-muted">
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </span>
+      <span className="text-right">
+        <span className="flex items-center justify-end gap-1.5">
+          <span className="tabular-figure text-sm font-semibold text-ink">{value}</span>
+          {statusBadge}
+        </span>
+        {caption && <span className="block text-xs text-ink-muted">{caption}</span>}
+      </span>
     </div>
   );
 }
 
-function InfoIcon(props: SVGProps<SVGSVGElement>) {
+function capitalValueDisplay(
+  capitalValue: CapitalValueResult,
+  copy: Translations["results"]["buyVsRent"]["metrics"],
+): string {
+  if (!capitalValue.accumulates) return copy.capitalValueNo;
+  return copy.capitalValueYes(formatTHB(capitalValue.amountTHB ?? 0));
+}
+
+/** Small colored dot-tag on the Remaining monthly income row — the only
+ *  place cushion status (Comfortable/Tight/High Risk) is shown; no
+ *  duplicate badge next to each option's title, so there's exactly one
+ *  reading to look at, directly attached to the number it describes. */
+function CushionTag({
+  status,
+  copy,
+}: {
+  status: CashFlowRiskLevel;
+  copy: Translations["results"]["buyVsRent"]["metrics"];
+}) {
+  const style = CASH_FLOW_RISK_STYLES[status];
   return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-      <circle cx="10" cy="10" r="7.25" />
-      <path d="M10 9.2v4" />
-      <circle cx="10" cy="6.6" r="0.15" fill="currentColor" stroke="currentColor" strokeWidth={1.4} />
+    <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${style.text}`}>
+      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${style.bg}`} />
+      {copy.cushionStatusLabels[status]}
+    </span>
+  );
+}
+
+function CheckIcon(props: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M4.5 10.5l3.5 3.5 7.5-8" />
     </svg>
   );
 }
 
-type RemainingFactorKey = "housing" | "livingExpenses" | "debt";
-
-/**
- * Ranks this scenario's three outflow categories by actual monthly amount
- * (largest first), each paired with its share of gross income. Purely a
- * presentation-layer derivation over the already-computed CashFlowBreakdown
- * — reuses its numbers as-is, no new business logic. `housingLabel` is
- * scenario-specific (e.g. "Monthly rent" vs. "Mortgage payment") so the
- * explanation names the actual payment type, not a generic one.
- */
-function rankRemainingFactors(
-  data: CashFlowBreakdown,
-  housingLabel: string,
-  copy: Translations["results"]["buyVsRent"],
-): { key: RemainingFactorKey; label: string; amountTHB: number; pctOfIncome: number }[] {
-  const pctOfIncome = (part: number) =>
-    data.incomeMonthly > 0 ? Math.round((part / data.incomeMonthly) * 100) : 0;
-
-  return [
-    {
-      key: "housing" as const,
-      label: housingLabel,
-      amountTHB: data.housingPaymentMonthly,
-      pctOfIncome: pctOfIncome(data.housingPaymentMonthly),
-    },
-    {
-      key: "livingExpenses" as const,
-      label: copy.allocation.livingExpenses,
-      amountTHB: data.livingExpensesMonthly,
-      pctOfIncome: pctOfIncome(data.livingExpensesMonthly),
-    },
-    {
-      key: "debt" as const,
-      label: copy.allocation.debt,
-      amountTHB: data.debtMonthly,
-      pctOfIncome: pctOfIncome(data.debtMonthly),
-    },
-  ]
-    .filter((factor) => factor.amountTHB > 0)
-    .sort((a, b) => b.amountTHB - a.amountTHB);
-}
-
-/**
- * Dynamically explains WHY this scenario's "money left over" figure landed
- * where it did, naming the actual biggest driver(s) from the user's own
- * numbers — never a generic message. A second factor is only named
- * alongside the first when it's genuinely comparable in size (within 60% of
- * the top one), so the explanation doesn't overstate a minor contributor.
- */
-function explainRemainingCashFlow(
-  data: CashFlowBreakdown,
-  housingLabel: string,
-  copy: Translations["results"]["buyVsRent"],
-): string {
-  const explanation = copy.metrics.remainingExplanation;
-  const [top, second] = rankRemainingFactors(data, housingLabel, copy);
-
-  if (!top) {
-    return explanation.noExpenses;
-  }
-
-  const includeSecond = second !== undefined && second.amountTHB >= top.amountTHB * 0.6;
-  const topPct = `${top.pctOfIncome}%`;
-
-  if (data.remainingMonthly < 0) {
-    const formattedShortfall = formatTHB(Math.abs(data.remainingMonthly));
-    return includeSecond
-      ? explanation.shortfallWithSecond(formattedShortfall, top.label, topPct, second.label, `${second.pctOfIncome}%`)
-      : explanation.shortfall(formattedShortfall, top.label, topPct);
-  }
-
-  if (data.cushionStatus === "comfortable") {
-    return explanation.comfortable(top.label, `${Math.round(data.remainingPct)}%`);
-  }
-
-  return includeSecond
-    ? explanation.tightWithSecond(top.label, topPct, second.label, `${second.pctOfIncome}%`)
-    : explanation.tight(top.label, topPct);
-}
-
-function RemainingCashFlowStat({
-  label,
-  infoLabel,
-  value,
-  caption,
-  explanation,
-}: {
-  label: string;
-  infoLabel: string;
-  value: string;
-  caption: string;
-  explanation: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const tooltipId = useId();
-  const open = () => setIsOpen(true);
-  const close = () => setIsOpen(false);
-
+/** The (i) glyph itself — purely decorative where it's used bare (e.g. the
+ *  section divider rows), or wrapped as the click target inside InfoTooltip
+ *  below where a row has a real explanation to show. */
+function InfoDot({ className = "" }: { className?: string }) {
   return (
-    <button
-      type="button"
-      className="relative mt-4 block w-full cursor-help rounded-xl bg-surface p-4 text-left ring-1 ring-black/5"
-      onMouseEnter={open}
-      onMouseLeave={close}
-      onFocus={open}
-      onBlur={close}
-      aria-describedby={tooltipId}
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+      className={`h-3.5 w-3.5 shrink-0 text-ink-muted/60 ${className}`}
     >
-      <div className="flex items-center gap-1">
-        <p className="text-xs font-medium text-ink-muted">{label}</p>
-        <InfoIcon className="h-3.5 w-3.5 shrink-0 text-ink-muted" />
-        <span className="sr-only">{infoLabel}</span>
-      </div>
-      <p className="hero-figure mt-1 text-3xl font-bold text-ink sm:text-4xl">{value}</p>
-      <p className="mt-1 text-xs text-ink-muted">{caption}</p>
-
-      {/* Opens upward, not downward: this stat sits at the bottom of the
-          scenario card, which itself sits inside the swipeable carousel's
-          overflow-hidden track (required to clip the off-screen sibling
-          slides during a swipe). A downward popup would render past the
-          card's last element and get clipped by that ancestor; opening
-          upward stays within the space the card's own content already
-          occupies. */}
-      <div
-        id={tooltipId}
-        role="tooltip"
-        className={`pointer-events-none absolute bottom-full left-0 right-0 z-10 mb-2 rounded-lg bg-surface p-3 text-left text-xs font-normal text-ink shadow-lg ring-1 ring-black/10 transition-opacity duration-150 ${
-          isOpen ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        {explanation}
-      </div>
-    </button>
+      <circle cx="10" cy="10" r="8" />
+      <path d="M10 9v4.5" strokeLinecap="round" />
+      <circle cx="10" cy="6.75" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 
-/** Drag/swipe threshold, in fraction of the track's width, past which a
- *  release commits to the next/previous slide. */
-const DRAG_COMMIT_RATIO = 0.18;
-/** Fast, short flicks below the distance threshold still commit if they
- *  clear this speed (px/ms), so a quick flick feels as responsive as a
- *  full drag. */
-const FLICK_VELOCITY_PX_MS = 0.5;
+/** Click/tap-to-open explanation popover for a Financial Snapshot row's (i)
+ *  icon — deliberately click-triggered rather than hover, since hover has
+ *  no equivalent on touch devices and the row is inside a clickable
+ *  scenario card/column (stopPropagation keeps opening the popover from
+ *  also selecting that scenario). Closes on an outside pointerdown, Escape,
+ *  or toggling the icon again. */
+function InfoTooltip({ text }: { text: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <span ref={containerRef} className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="More info"
+        aria-expanded={isOpen}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((open) => !open);
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+        className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
+      >
+        <InfoDot />
+      </button>
+      {isOpen && (
+        <span
+          role="tooltip"
+          className="absolute left-0 top-full z-20 mt-1.5 w-60 max-w-[80vw] rounded-lg border border-black/10 bg-white p-3 text-left text-xs font-normal normal-case leading-snug tracking-normal text-ink shadow-lg"
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Non-Financial pillar copy (see i18n en.ts/th.ts "pillars") always leads
+ *  with an intensity word followed by " — " and a plain-language reason
+ *  ("Highest — easy to move..."). This buckets that leading word into the
+ *  same 3-tier mint/mandarin/critical language used everywhere else in the
+ *  app (see cashFlowRiskStyles.ts) — a pure intensity scale, not a
+ *  good/bad judgment, since e.g. "Highest" is a good sign for Flexibility
+ *  but a bad one for Debt Risk; color here just lets users scan magnitude
+ *  across the three columns, and the row label + surrounding sentence
+ *  still carry the actual meaning.
+ *
+ *  Ordered longest/most-specific prefix first so e.g. "Lowest"/"ต่ำที่สุด"
+ *  and "Low-moderate"/"ต่ำถึงปานกลาง" are matched before the shorter
+ *  "Low"/"ต่ำ" they both start with. */
+const STATUS_WORD_RULES: { prefixes: string[]; className: string }[] = [
+  { prefixes: ["low-moderate", "ต่ำถึงปานกลาง"], className: "text-brand-mandarin" },
+  { prefixes: ["lowest", "ต่ำที่สุด"], className: "text-brand-mint" },
+  { prefixes: ["highest", "สูงที่สุด"], className: "text-brand-critical" },
+  { prefixes: ["low", "ต่ำ", "none", "ไม่มี"], className: "text-brand-mint" },
+  { prefixes: ["high", "สูง"], className: "text-brand-critical" },
+  { prefixes: ["moderate", "medium", "ปานกลาง"], className: "text-brand-mandarin" },
+];
+
+function statusWordClassName(statusWord: string): string {
+  const normalized = statusWord.trim().toLowerCase();
+  const rule = STATUS_WORD_RULES.find((r) => r.prefixes.some((prefix) => normalized.startsWith(prefix)));
+  return rule?.className ?? "text-ink";
+}
+
+/** Splits "Highest — easy to move..." into a colored leading status word
+ *  (see STATUS_WORD_RULES) plus the unstyled rest of the sentence. Falls
+ *  back to plain text if the copy doesn't follow that pattern. */
+function StatusPhrase({ text }: { text: string }) {
+  const separatorIndex = text.indexOf(" — ");
+  if (separatorIndex === -1) return <>{text}</>;
+  const statusWord = text.slice(0, separatorIndex);
+  const rest = text.slice(separatorIndex);
+  return (
+    <>
+      <span className={`font-semibold ${statusWordClassName(statusWord)}`}>{statusWord}</span>
+      {rest}
+    </>
+  );
+}
 
 export function BuyVsRentComparison({
   byBudget,
   byTarget,
-  rentalYieldPct,
-  rtoPriceMarkupPct,
+  rtoGapPlanByBudget,
+  rtoGapPlanByTarget,
+  rentGapPlanByBudget,
+  rentGapPlanByTarget,
+  assumptions,
   appreciationPct,
+  selectedScenario,
+  onSelectScenario,
+  purchasingPower,
+  availableDownPayment,
 }: BuyVsRentComparisonProps) {
   const { t } = useLanguage();
   const copy = t.results.buyVsRent;
 
-  // Which home price basis the whole section is rooted at right now — every
-  // number below (RTO, monthly cash flow, 10-year value) comes from
-  // `selected`, recomputed for that basis (see BuyVsRentOption). Defaults to
-  // "budget" — the more realistic/actionable ceiling — but either is a
-  // complete, self-consistent view.
+  // Which home price basis this section is currently rooted at — every
+  // number below (RTO, monthly cash flow, 10-year value, and now Gap &
+  // Plan too) comes from `buyVsRent`, recomputed for that basis (see
+  // BuyVsRentOption). Defaults to "budget" (Recommended Home Price) — the
+  // more realistic/actionable ceiling — but either is a complete,
+  // self-consistent view.
   const [basis, setBasis] = useState<HomePriceBasisKey>("budget");
-  const selected = basis === "budget" ? byBudget : byTarget;
-  const { cashFlow, wealthComparison, rentToOwn } = selected;
+  const buyVsRent = basis === "budget" ? byBudget : byTarget;
+  const rtoGapPlan = basis === "budget" ? rtoGapPlanByBudget : rtoGapPlanByTarget;
+  const rentGapPlan = basis === "budget" ? rentGapPlanByBudget : rentGapPlanByTarget;
+  const { cashFlow, wealthComparison, capitalValue } = buyVsRent;
   const todayLabel = basis === "budget" ? copy.valueHighlight.todayLabelBudget : copy.valueHighlight.todayLabelTarget;
   const basisLabel = basis === "budget" ? copy.valueHighlight.basisLabelBudget : copy.valueHighlight.basisLabelTarget;
 
-  const homeValueYearTen = wealthComparison.affordableHomeValueYear10;
-
-  // Order matters here: Rent -> Rent-to-Own -> Buy is the deliberate
-  // "path toward ownership" story the section tells, from the most
-  // flexible/lowest-commitment option to full ownership.
   const scenarios: {
     key: ScenarioKey;
     label: string;
     note: string;
-    housingLabel: string;
+    initialPaymentCaption: string;
+    /** RTO-only: explains the Monthly Payment figure is the 3-year RTO rate,
+     *  not one flat payment for all 10 years (see RentToOwnResult). Omitted
+     *  for Buy/Rent — their monthly payment genuinely is one flat figure. */
+    monthlyPaymentCaption?: string;
     data: CashFlowBreakdown;
+    pillars: Translations["results"]["buyVsRent"]["nonFinancial"]["pillars"]["rent"];
+    capitalValue: CapitalValueResult;
   }[] = [
     {
       key: "rent",
       label: copy.scenarioRent,
       note: copy.scenarioNotes.rent,
-      housingLabel: copy.housingPaymentLabels.rent,
+      initialPaymentCaption: copy.metrics.initialPaymentCaptions.rent,
       data: cashFlow.rent,
+      pillars: copy.nonFinancial.pillars.rent,
+      capitalValue: capitalValue.rent,
     },
     {
       key: "rentToOwn",
       label: copy.scenarioRentToOwn,
       note: copy.scenarioNotes.rentToOwn,
-      housingLabel: copy.housingPaymentLabels.rentToOwn,
+      initialPaymentCaption: copy.metrics.initialPaymentCaptions.rentToOwn,
+      monthlyPaymentCaption: copy.metrics.rentToOwnMonthlyPaymentCaption(
+        formatTHB(buyVsRent.rentToOwn.postTransitionMonthlyPaymentTHB),
+      ),
       data: cashFlow.rentToOwn,
+      pillars: copy.nonFinancial.pillars.rentToOwn,
+      capitalValue: capitalValue.rentToOwn,
     },
     {
       key: "buy",
       label: copy.scenarioBuy,
       note: copy.scenarioNotes.buy,
-      housingLabel: copy.housingPaymentLabels.buy,
+      initialPaymentCaption: copy.metrics.initialPaymentCaptions.buy,
       data: cashFlow.buy,
+      pillars: copy.nonFinancial.pillars.buy,
+      capitalValue: capitalValue.buy,
     },
   ];
-  const lastIndex = scenarios.length - 1;
 
-  // --- Swipeable carousel: one scenario visible at a time, switched by
-  // dragging/swiping the track or via the prev/next controls. Pointer
-  // events unify mouse, touch, and pen, so the same handlers drive both
-  // desktop drag and mobile swipe. ---
-  const [index, setIndex] = useState(0);
-  const [dragPx, setDragPx] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const indexRef = useRef(index);
-  indexRef.current = index;
-  // Live gesture values live in refs, not state: state updates are batched
-  // and only visible to closures after a re-render, but a pointerup can
-  // fire in the same synchronous dispatch as the preceding pointermove
-  // (no render in between) — reading state in endGesture would then see a
-  // stale value. Refs are always current regardless of render timing.
-  const dragPxRef = useRef(0);
-  const trackWidthRef = useRef(0);
-  const gestureRef = useRef<{ x: number; y: number; startTime: number } | null>(null);
-  const axisRef = useRef<"x" | "y" | null>(null);
+  type Scenario = (typeof scenarios)[number];
 
-  const goTo = (next: number) => setIndex(Math.max(0, Math.min(lastIndex, next)));
-  const showPrevious = () => goTo(indexRef.current - 1);
-  const showNext = () => goTo(indexRef.current + 1);
+  // Shared row definitions — drive both the mobile stacked cards and the
+  // desktop shared-label table below, so the two layouts can never drift
+  // out of sync with each other.
+  const metricRows: {
+    key: string;
+    label: string;
+    tooltip: string;
+    value: (s: Scenario) => string;
+    /** Optional — omitted for rows where the value is self-explanatory
+     *  (Monthly payment, Total paid over 10 years) so the tooltip is the
+     *  one place that explains them, instead of repeating under every
+     *  figure. */
+    caption?: (s: Scenario) => string;
+    /** Only set for "remaining" — the cushion status (Comfortable/Tight/
+     *  High Risk) is derived directly from this row's own number, so it's
+     *  tagged here rather than only in the option header (see CushionTag). */
+    statusBadge?: (s: Scenario) => ReactNode;
+  }[] = [
+    {
+      key: "initial",
+      label: copy.metrics.initialPaymentLabel,
+      tooltip: copy.metrics.tooltips.initialPayment,
+      value: (s) => formatTHB(s.data.initialPaymentTHB),
+      caption: (s) => s.initialPaymentCaption,
+    },
+    {
+      key: "monthly",
+      label: copy.metrics.monthlyPaymentLabel,
+      tooltip: copy.metrics.tooltips.monthlyPayment,
+      value: (s) => formatTHB(s.data.housingPaymentMonthly),
+      caption: (s) => s.monthlyPaymentCaption ?? "",
+    },
+    {
+      key: "remaining",
+      label: copy.metrics.remainingLabel,
+      tooltip: copy.metrics.tooltips.remaining,
+      value: (s) => formatTHB(s.data.remainingMonthly),
+      // Display-only floor: a negative remainingPct is a real shortfall
+      // (still drives cushionStatus/CushionTag below), but shown as 0% here
+      // rather than a confusing negative percentage.
+      caption: (s) => copy.metrics.remainingPctCaption(`${Math.round(Math.max(0, s.data.remainingPct))}%`),
+      statusBadge: (s) => <CushionTag status={s.data.cushionStatus} copy={copy.metrics} />,
+    },
+    {
+      key: "totalPaid",
+      label: copy.metrics.totalPaidLabel,
+      tooltip: copy.metrics.tooltips.totalPaid,
+      value: (s) => formatTHB(s.data.totalPaidOver10YearsTHB),
+    },
+    {
+      key: "capitalValue",
+      label: copy.metrics.capitalValueLabel,
+      tooltip: copy.metrics.tooltips.capitalValue,
+      value: (s) => (s.capitalValue.accumulates ? "✓" : "✕"),
+      caption: (s) => capitalValueDisplay(s.capitalValue, copy.metrics),
+    },
+  ];
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    trackWidthRef.current = e.currentTarget.offsetWidth || 1;
-    gestureRef.current = { x: e.clientX, y: e.clientY, startTime: performance.now() };
-    axisRef.current = null;
-    dragPxRef.current = 0;
-    setIsDragging(true);
-    setDragPx(0);
-  };
-
-  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const gesture = gestureRef.current;
-    if (!gesture) return;
-    const dx = e.clientX - gesture.x;
-    const dy = e.clientY - gesture.y;
-    if (axisRef.current === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
-      axisRef.current = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-    }
-    if (axisRef.current !== "x") return;
-    // Resistance past the first/last slide so the drag doesn't run away.
-    const atStart = indexRef.current === 0 && dx > 0;
-    const atEnd = indexRef.current === lastIndex && dx < 0;
-    const next = atStart || atEnd ? dx / 3 : dx;
-    dragPxRef.current = next;
-    setDragPx(next);
-  };
-
-  const endGesture = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const gesture = gestureRef.current;
-    if (axisRef.current === "x" && gesture) {
-      const finalDragPx = dragPxRef.current;
-      const elapsed = Math.max(1, performance.now() - gesture.startTime);
-      const velocity = finalDragPx / elapsed;
-      const distanceThreshold = trackWidthRef.current * DRAG_COMMIT_RATIO;
-      if (finalDragPx <= -distanceThreshold || velocity <= -FLICK_VELOCITY_PX_MS) {
-        showNext();
-      } else if (finalDragPx >= distanceThreshold || velocity >= FLICK_VELOCITY_PX_MS) {
-        showPrevious();
-      }
-    }
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-    gestureRef.current = null;
-    axisRef.current = null;
-    dragPxRef.current = 0;
-    setIsDragging(false);
-    setDragPx(0);
-  };
-
-  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "ArrowLeft") showPrevious();
-    if (e.key === "ArrowRight") showNext();
-  };
-
-  const activeKey = scenarios[index].key;
+  const pillarRows: { key: string; label: string; tooltip: string; value: (s: Scenario) => ReactNode }[] = [
+    {
+      key: "flexibility",
+      label: copy.nonFinancial.flexibilityLabel,
+      tooltip: copy.nonFinancial.tooltips.flexibility,
+      value: (s) => <StatusPhrase text={s.pillars.flexibility} />,
+    },
+    {
+      key: "barrier",
+      label: copy.nonFinancial.barrierToEntryLabel,
+      tooltip: copy.nonFinancial.tooltips.barrierToEntry,
+      value: (s) => <StatusPhrase text={s.pillars.barrierToEntry} />,
+    },
+    {
+      key: "debtRisk",
+      label: copy.nonFinancial.debtRiskLabel,
+      tooltip: copy.nonFinancial.tooltips.debtRisk,
+      value: (s) => <StatusPhrase text={s.pillars.debtRisk} />,
+    },
+  ];
 
   return (
-    <Card eyebrow={copy.eyebrow} title={copy.title}>
+    <Card title={copy.title}>
       <div className="space-y-8">
         {/* Home price basis toggle — governs every number below (RTO,
-            monthly cash flow, 10-year value), not just this block. */}
+            monthly cash flow, 10-year value) except Gap & Plan. */}
         <SegmentedControl
           label={copy.basisToggle.label}
           value={basis}
@@ -425,219 +441,296 @@ export function BuyVsRentComparison({
           ]}
         />
 
-        {/* 10-year home value — the primary visual focus while Buy is
-            active. Renting builds no equivalent asset, and Rent-to-Own
-            builds toward ownership on its own terms, so each of those
-            slides swaps in a short explanatory note instead of a home-value
-            figure, rather than showing a number that would misleadingly
-            imply otherwise. */}
-        <div
-          className={`rounded-2xl border-l-4 bg-surface-sunken p-5 sm:p-6 ${
-            activeKey === "buy" ? "border-brand-mint" : "border-black/10"
-          }`}
-        >
-          <p className={SECTION_LABEL_CLASS}>{copy.valueHighlight.eyebrow}</p>
-          {activeKey === "buy" ? (
-            <>
-              <div className="mt-3 flex flex-wrap items-center gap-3 sm:gap-5">
-                <div>
-                  <p className="text-xs font-medium text-ink-muted">{todayLabel}</p>
-                  <p className="hero-figure mt-0.5 text-2xl font-bold text-ink-muted sm:text-3xl">
-                    {formatTHB(selected.homePriceBasis)}
-                  </p>
-                </div>
-                <ArrowRightIcon className="h-5 w-5 shrink-0 text-ink-muted sm:h-6 sm:w-6" />
-                <div>
-                  <p className="text-xs font-medium text-ink-muted">{copy.valueHighlight.futureLabel}</p>
-                  <p className="hero-figure mt-0.5 text-3xl font-bold text-ink sm:text-4xl">
-                    {formatTHB(homeValueYearTen)}
-                  </p>
-                </div>
+        {/* 10-year home value — shown once up front rather than per-card;
+            each card's own Capital Value row also carries this same number.
+            Hidden while Rent is selected: renting builds no property value
+            at all, so this headline has nothing true to say there. Identical
+            for Buy and RTO — a home's market value depends on the home
+            itself, not on how it's financed, so the RTO markup never
+            inflates this figure (see RentToOwnResult.
+            projectedHomeValueYear10THB). No RTO-specific branch needed: both
+            scenarios show the exact same homePriceBasis -> year-10 value. */}
+        {selectedScenario !== "rent" && (
+          <div className="rounded-2xl border-l-4 border-brand-mint bg-surface-sunken p-5 sm:p-6">
+            <p className={SECTION_LABEL_CLASS}>{copy.valueHighlight.eyebrow}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3 sm:gap-5">
+              <div>
+                <p className="text-xs font-medium text-ink-muted">{todayLabel}</p>
+                <p className="hero-figure mt-0.5 text-2xl font-bold text-ink-muted sm:text-3xl">
+                  {formatTHB(buyVsRent.homePriceBasis)}
+                </p>
               </div>
-              <p className="mt-3 text-sm text-ink-muted">
-                {copy.valueHighlight.growthNote(
-                  formatTHB(selected.homePriceBasis),
-                  formatPercent(appreciationPct, 1),
-                  basisLabel,
-                )}
-              </p>
-            </>
-          ) : activeKey === "rentToOwn" ? (
-            <p className="mt-3 text-sm text-ink-muted">
-              {copy.valueHighlight.rentToOwnNote(formatTHB(rentToOwn.paidTowardPriceAfter3YearsTHB))}
-            </p>
-          ) : (
-            <p className="mt-3 text-sm text-ink-muted">{copy.valueHighlight.rentNote}</p>
-          )}
-        </div>
-
-        {/* Swipeable rent/rent-to-own/buy comparison — one scenario on
-            screen at a time. */}
-        <div>
-          <div className="flex items-baseline justify-between gap-3">
-            <p className={SECTION_LABEL_CLASS}>{copy.comparisonTitle}</p>
-            <p className="hidden text-xs text-ink-muted sm:block">{copy.swipeHint}</p>
-          </div>
-
-          <div className="mt-3 flex items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={showPrevious}
-              disabled={index === 0}
-              aria-label={copy.previousCard}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted ring-1 ring-black/10 transition-colors hover:text-ink disabled:opacity-30"
-            >
-              <ChevronIcon direction="left" className="h-4 w-4" />
-            </button>
-
-            <div
-              className="min-w-0 flex-1 select-none overflow-hidden"
-              style={{ touchAction: "pan-y" }}
-              role="region"
-              aria-roledescription="carousel"
-              aria-label={copy.comparisonTitle}
-              tabIndex={0}
-              onKeyDown={onKeyDown}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={endGesture}
-              onPointerCancel={endGesture}
-            >
-              <div
-                className={`flex ${isDragging ? "" : "transition-transform duration-300 ease-out"}`}
-                style={{
-                  transform: `translateX(calc(${-index * 100}% + ${dragPx}px))`,
-                  cursor: isDragging ? "grabbing" : "grab",
-                }}
-              >
-                {scenarios.map((scenario, i) => {
-                  const cushionStyle = CASH_FLOW_RISK_STYLES[scenario.data.cushionStatus];
-
-                  return (
-                    <div
-                      key={scenario.key}
-                      className="w-full shrink-0 px-1"
-                      aria-hidden={i !== index}
-                      role="group"
-                      aria-roledescription="slide"
-                      aria-label={scenario.label}
-                    >
-                      <div
-                        className={`rounded-2xl border-t-4 bg-surface-sunken p-5 sm:p-6 ${SCENARIO_ACCENT_CLASS[scenario.key]}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h4 className="text-lg font-semibold text-ink">{scenario.label}</h4>
-                            <p className="mt-1 text-sm text-ink-muted">{scenario.note}</p>
-                          </div>
-                          <span
-                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${cushionStyle.text} ${cushionStyle.border}`}
-                          >
-                            <span aria-hidden="true">{cushionStyle.icon}</span>
-                            {copy.metrics.cushionStatusLabels[scenario.data.cushionStatus]}
-                          </span>
-                        </div>
-
-                        <div className="mt-4">
-                          <p className={SECTION_LABEL_CLASS}>{copy.allocation.title}</p>
-                          <div className="mt-3 flex flex-col items-center">
-                            <div className="w-full max-w-xs rounded-2xl bg-brand-blue/8 p-4 text-center ring-1 ring-brand-blue/15">
-                              <IconBadge tone="accent">
-                                <CoinIcon className="h-5 w-5" />
-                              </IconBadge>
-                              <p className="mt-2 text-xs font-medium text-ink-muted">{copy.metrics.income}</p>
-                              <p className="hero-figure mt-0.5 text-2xl font-bold text-ink">
-                                {formatTHB(scenario.data.incomeMonthly)}
-                              </p>
-                            </div>
-
-                            <span className="my-3 h-6 w-px bg-black/10" aria-hidden="true" />
-
-                            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
-                              <OutflowTile
-                                icon={CartIcon}
-                                label={copy.allocation.livingExpenses}
-                                value={formatTHB(scenario.data.livingExpensesMonthly)}
-                              />
-                              <OutflowTile
-                                icon={HomeIcon}
-                                label={scenario.housingLabel}
-                                value={formatTHB(scenario.data.housingPaymentMonthly)}
-                              />
-                              <OutflowTile
-                                icon={CardIcon}
-                                label={copy.allocation.debt}
-                                value={formatTHB(scenario.data.debtMonthly)}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <RemainingCashFlowStat
-                          label={copy.metrics.remainingLabel}
-                          infoLabel={copy.metrics.remainingExplanation.infoLabel}
-                          value={formatTHB(scenario.data.remainingMonthly)}
-                          caption={copy.metrics.remainingPctCaption(`${Math.round(scenario.data.remainingPct)}%`)}
-                          explanation={explainRemainingCashFlow(scenario.data, scenario.housingLabel, copy)}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+              <ArrowRightIcon className="h-5 w-5 shrink-0 text-ink-muted sm:h-6 sm:w-6" />
+              <div>
+                <p className="text-xs font-medium text-ink-muted">{copy.valueHighlight.futureLabel}</p>
+                <p className="hero-figure mt-0.5 text-3xl font-bold text-ink sm:text-4xl">
+                  {formatTHB(wealthComparison.affordableHomeValueYear10)}
+                </p>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={showNext}
-              disabled={index === lastIndex}
-              aria-label={copy.nextCard}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted ring-1 ring-black/10 transition-colors hover:text-ink disabled:opacity-30"
-            >
-              <ChevronIcon direction="right" className="h-4 w-4" />
-            </button>
+            <p className="mt-3 text-sm text-ink-muted">
+              {copy.valueHighlight.growthNote(formatTHB(buyVsRent.homePriceBasis), formatPercent(appreciationPct, 1), basisLabel)}
+            </p>
           </div>
-
-          <div className="mt-3 flex justify-center gap-1.5">
-            {scenarios.map((scenario, i) => (
-              <button
-                key={scenario.key}
-                type="button"
-                onClick={() => goTo(i)}
-                aria-label={scenario.label}
-                aria-current={index === i}
-                className={`h-1.5 w-4 rounded-full transition-colors ${
-                  index === i ? "bg-brand-blue" : "bg-black/15"
-                }`}
-              />
-            ))}
-          </div>
-          <p className="mt-2 text-center text-xs text-ink-muted sm:hidden">{copy.swipeHint}</p>
-        </div>
-
-        {/* Neutral 3-way recommendation summary — each option states its
-            own trade-off, grounded in its own real monthly payment; none is
-            framed as the "winner". */}
-        <div className="rounded-xl bg-surface-sunken p-5">
-          <p className={SECTION_LABEL_CLASS}>{copy.recommendation.eyebrow}</p>
-          <ul className="mt-2 list-disc space-y-1.5 pl-4 text-sm text-ink">
-            <li>{copy.recommendation.rentSummary(formatTHB(cashFlow.rent.housingPaymentMonthly))}</li>
-            <li>{copy.recommendation.rentToOwnSummary(formatTHB(cashFlow.rentToOwn.housingPaymentMonthly))}</li>
-            <li>{copy.recommendation.buySummary(formatTHB(cashFlow.buy.housingPaymentMonthly))}</li>
-          </ul>
-        </div>
-      </div>
-
-      <p className="mt-4 text-xs text-ink-muted">
-        {copy.rentEstimateNote(
-          formatPercent(rentalYieldPct, 1),
-          formatTHB(wealthComparison.estimatedMonthlyRent),
-          basisLabel,
         )}
-      </p>
-      <p className="mt-1 text-xs text-ink-muted">
-        {copy.rentToOwnEstimateNote(formatTHB(rentToOwn.contractFeeTHB), formatPercent(rtoPriceMarkupPct, 0), basisLabel)}
-      </p>
+
+        {/* Side-by-side comparison — a shared-label table on wider screens
+            (label column + one column per scenario, so every metric lines
+            up in a single glance across all three options), stacked
+            self-contained cards on mobile where a 4-column table would be
+            too cramped to read. */}
+        <div>
+          <p className={SECTION_LABEL_CLASS}>{copy.comparisonTitle}</p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-brand-blue">
+            <TapIcon className="h-3.5 w-3.5 flex-shrink-0" />
+            {copy.selectHint}
+          </p>
+
+          {/* Mobile: stacked cards, each self-contained with inline labels. */}
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:hidden">
+            {scenarios.map((scenario) => {
+              const gapPlanKey = SCENARIO_TO_GAP_PLAN[scenario.key];
+              const isSelected = selectedScenario === gapPlanKey;
+              const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectScenario(gapPlanKey);
+                }
+              };
+              return (
+                <div
+                  key={scenario.key}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  onClick={() => onSelectScenario(gapPlanKey)}
+                  onKeyDown={onKeyDown}
+                  className={`relative cursor-pointer rounded-2xl border-t-4 bg-surface-sunken p-5 ring-2 transition-shadow focus-visible:outline-none ${
+                    SCENARIO_ACCENT_CLASS[scenario.key]
+                  } ${isSelected ? "ring-brand-blue" : "ring-transparent hover:ring-black/10"}`}
+                >
+                  {isSelected && (
+                    <span className="absolute -top-2.5 right-4 inline-flex items-center gap-1 rounded-full bg-brand-blue px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+                      <CheckIcon className="h-3 w-3" />
+                      {copy.selectedBadge}
+                    </span>
+                  )}
+
+                  <h4 className="text-lg font-semibold text-ink">{scenario.label}</h4>
+
+                  <p className="mt-1 text-xs text-ink-muted">{scenario.note}</p>
+
+                  {metricRows.map((row, i) => (
+                    <MetricRow
+                      key={row.key}
+                      className={i === 0 ? "mt-4" : ""}
+                      label={row.label}
+                      tooltip={row.tooltip}
+                      value={row.value(scenario)}
+                      caption={row.caption?.(scenario)}
+                      statusBadge={row.statusBadge?.(scenario)}
+                    />
+                  ))}
+
+                  <p className={`${SECTION_LABEL_CLASS} mt-4 border-t border-black/10 pt-3`}>{copy.nonFinancial.title}</p>
+
+                  <dl className="contents text-xs">
+                    {pillarRows.map((row) => (
+                      <div key={row.key} className="mt-2">
+                        <dt className="flex items-center gap-1 font-medium text-ink-muted">
+                          {row.label}
+                          <InfoTooltip text={row.tooltip} />
+                        </dt>
+                        <dd className="text-ink">{row.value(scenario)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop: one shared table — a label column on the left plus one
+              column per scenario, so every row (Initial payment, Monthly
+              payment, ...) is directly comparable without eye travel between
+              three separate cards. Each scenario's column is one continuous
+              selectable region (header through the last row): a decorative
+              "column" div spans every row via `grid-row: 1 / -1` and carries
+              the border/tint/click-handling, while the actual row content
+              renders as ordinary (non-spanning) grid cells on top of it —
+              keeping normal per-row height alignment — with
+              `pointer-events-none` so clicks fall through to the spanning
+              column div beneath. */}
+          <div className="mt-3 hidden sm:block">
+            {/* Explicit 11-row template (header, 2 section dividers, 5
+                metrics, 3 pillars) is required for `gridRow: "1 / -1"`
+                below to resolve correctly — a negative row line counts from
+                the end of the *explicit* grid, so without
+                grid-template-rows there's no explicit grid for "-1" to
+                count from, and each overlay would collapse to a single
+                implicit row instead of spanning the whole column. */}
+            <div className="grid grid-cols-[minmax(140px,1fr)_repeat(3,1.5fr)] [grid-template-rows:repeat(11,auto)]">
+              {/* Every cell below is placed with an explicit gridRow/gridColumn
+                  rather than relying on document-order auto-placement: the
+                  overlay divs already occupy columns 2-4 across every row
+                  (via `gridRow: "1 / -1"`), and CSS Grid's auto-placement
+                  algorithm treats those as unavailable, which would shove
+                  any auto-placed sibling into the wrong cell. Explicit
+                  coordinates sidestep that entirely. */}
+              {scenarios.map((scenario, colIndex) => {
+                const gapPlanKey = SCENARIO_TO_GAP_PLAN[scenario.key];
+                const isSelected = selectedScenario === gapPlanKey;
+                const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectScenario(gapPlanKey);
+                  }
+                };
+                return (
+                  <div
+                    key={scenario.key}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    onClick={() => onSelectScenario(gapPlanKey)}
+                    onKeyDown={onKeyDown}
+                    style={{ gridColumn: colIndex + 2, gridRow: "1 / -1" }}
+                    className={`relative cursor-pointer rounded-2xl border border-t-4 transition-colors focus-visible:outline-none ${
+                      SCENARIO_ACCENT_CLASS[scenario.key]
+                    } ${isSelected ? "border-brand-blue bg-brand-blue/5 ring-1 ring-brand-blue" : "border-black/10 hover:bg-black/[0.02]"}`}
+                  >
+                    {isSelected && (
+                      <span className="absolute -top-3 right-4 inline-flex items-center gap-1 rounded-full bg-brand-blue px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+                        <CheckIcon className="h-3 w-3" />
+                        {copy.selectedBadge}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Row 1: label column header + each scenario's title/note. */}
+              <div style={{ gridRow: 1, gridColumn: 1 }} className="border-b border-black/5 p-4 text-sm font-bold text-ink">
+                {copy.optionColumnLabel}
+              </div>
+              {scenarios.map((scenario, colIndex) => (
+                <div
+                  key={scenario.key}
+                  style={{ gridRow: 1, gridColumn: colIndex + 2 }}
+                  className="pointer-events-none border-b border-black/5 p-4"
+                >
+                  <h4 className="text-base font-semibold text-ink">{scenario.label}</h4>
+                  <p className="mt-1 text-xs text-ink-muted">{scenario.note}</p>
+                </div>
+              ))}
+
+              {/* Row 2: "Financial Snapshot" section divider. No (i) icon
+                  here — same reasoning as "Non-Financial" below: this title
+                  has no single explanation of its own, each row underneath
+                  carries its own tooltip instead. */}
+              <div
+                style={{ gridRow: 2, gridColumn: 1 }}
+                className="flex items-center gap-1 border-b border-black/5 px-4 py-2 text-sm font-bold text-ink"
+              >
+                {copy.metrics.sectionTitle}
+              </div>
+              {scenarios.map((scenario, colIndex) => (
+                <div
+                  key={`snapshot-${scenario.key}`}
+                  style={{ gridRow: 2, gridColumn: colIndex + 2 }}
+                  className="pointer-events-none border-b border-black/5"
+                />
+              ))}
+
+              {/* Rows 3-7: the 5 metric rows. */}
+              {metricRows.map((row, rowIndex) => {
+                const gridRow = rowIndex + 3;
+                return (
+                  <Fragment key={row.key}>
+                    <div
+                      style={{ gridRow, gridColumn: 1 }}
+                      className="flex items-center gap-1 border-b border-black/5 px-4 py-3 text-sm text-ink"
+                    >
+                      {row.label}
+                      <InfoTooltip text={row.tooltip} />
+                    </div>
+                    {scenarios.map((scenario, colIndex) => (
+                      <div
+                        key={`${row.key}-${scenario.key}`}
+                        style={{ gridRow, gridColumn: colIndex + 2 }}
+                        className="pointer-events-none border-b border-black/5 px-4 py-3"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <p className="tabular-figure text-sm font-bold text-ink">{row.value(scenario)}</p>
+                          {row.statusBadge?.(scenario)}
+                        </div>
+                        {row.caption?.(scenario) && (
+                          <p className="mt-0.5 text-xs text-ink-muted">{row.caption(scenario)}</p>
+                        )}
+                      </div>
+                    ))}
+                  </Fragment>
+                );
+              })}
+
+              {/* Row 8: "Non-Financial" section divider. No (i) icon here —
+                  unlike the metric rows, this title has no single
+                  explanation of its own; each of the 3 rows below carries
+                  its own tooltip instead. */}
+              <div
+                style={{ gridRow: 8, gridColumn: 1 }}
+                className="flex items-center gap-1 border-b border-black/5 px-4 py-2 text-sm font-bold text-ink"
+              >
+                {copy.nonFinancial.title}
+              </div>
+              {scenarios.map((scenario, colIndex) => (
+                <div
+                  key={`nonfinancial-${scenario.key}`}
+                  style={{ gridRow: 8, gridColumn: colIndex + 2 }}
+                  className="pointer-events-none border-b border-black/5"
+                />
+              ))}
+
+              {/* Rows 9-11: the 3 non-financial pillar rows. */}
+              {pillarRows.map((row, rowIndex) => {
+                const gridRow = rowIndex + 9;
+                const isLast = rowIndex === pillarRows.length - 1;
+                const borderClass = isLast ? "" : "border-b border-black/5";
+                return (
+                  <Fragment key={row.key}>
+                    <div
+                      style={{ gridRow, gridColumn: 1 }}
+                      className={`flex items-center gap-1 px-4 py-3 text-sm text-ink ${borderClass}`}
+                    >
+                      {row.label}
+                      <InfoTooltip text={row.tooltip} />
+                    </div>
+                    {scenarios.map((scenario, colIndex) => (
+                      <div
+                        key={`${row.key}-${scenario.key}`}
+                        style={{ gridRow, gridColumn: colIndex + 2 }}
+                        className={`pointer-events-none px-4 py-3 text-sm text-ink ${borderClass}`}
+                      >
+                        {row.value(scenario)}
+                      </div>
+                    ))}
+                  </Fragment>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <GapAndPlan
+          scenario={selectedScenario}
+          purchasingPower={purchasingPower}
+          homePriceBasis={buyVsRent.homePriceBasis}
+          assumptions={assumptions}
+          availableDownPayment={availableDownPayment}
+          rtoGapPlan={rtoGapPlan}
+          rentGapPlan={rentGapPlan}
+        />
+      </div>
     </Card>
   );
 }

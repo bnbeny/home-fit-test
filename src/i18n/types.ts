@@ -3,6 +3,7 @@ import type {
   ArchetypeKey,
   CashFlowRiskLevel,
   EmploymentType,
+  GapPlanScenario,
   HomePurchasePurpose,
   ReadinessStatus,
 } from "../types/finance";
@@ -29,6 +30,7 @@ export interface Translations {
   };
 
   form: {
+    /** Order: About You, Home Goals, Income, Debt, Expenses, Savings. */
     stepLabels: [string, string, string, string, string, string];
     back: string;
     next: string;
@@ -38,10 +40,26 @@ export interface Translations {
   };
 
   income: {
-    salary: string;
-    salaryHelp: string;
+    /** Toggle governing every slider below: whether the entered amounts are
+     *  monthly or annual. Display-only — always converted to/from monthly
+     *  before reaching QuestionnaireAnswers (see StepIncome). */
+    displayModeLabel: string;
+    displayModeMonthly: string;
+    displayModeAnnual: string;
+    primary: string;
+    primaryHelp: string;
+    additional: string;
+    additionalHelp: string;
     bonus: string;
     bonusHelp: string;
+    /** Section heading set off by a divider (see StepIncome) — keeps the
+     *  co-borrower field visually distinct from the applicant's own income
+     *  above, so it doesn't read as another "your own income" field. */
+    coBorrowerSectionLabel: string;
+    /** Optional — a co-borrower's regular monthly income, counted at full
+     *  weight (see QuestionnaireAnswers.coBorrowerIncomeMonthly). */
+    coBorrower: string;
+    coBorrowerHelp: string;
   };
 
   debt: {
@@ -49,6 +67,15 @@ export interface Translations {
     homeLoanHelp: string;
     otherDebt: string;
     otherDebtHelp: string;
+    /** Section heading set off by a divider (see StepDebt) — same treatment
+     *  as income.coBorrowerSectionLabel, for the same reason: a co-borrower's
+     *  debt is a different person's obligation, not another "your own debt"
+     *  field. */
+    coBorrowerSectionLabel: string;
+    /** Optional — a co-borrower's own existing debt (see
+     *  QuestionnaireAnswers.coBorrowerDebtMonthly). */
+    coBorrowerDebt: string;
+    coBorrowerDebtHelp: string;
   };
 
   expenses: {
@@ -66,8 +93,6 @@ export interface Translations {
     totalSavingsHelp: string;
     downPayment: string;
     downPaymentHelp: string;
-    maxInstallment: string;
-    maxInstallmentHelp: string;
   };
 
   aboutYou: {
@@ -79,32 +104,17 @@ export interface Translations {
   };
 
   homeGoals: {
-    targetPrice: string;
     timeline: string;
     timelineHelp: (years: string) => string;
     monthsUnit: (months: number) => string;
     purchasePurpose: string;
     purchasePurposeHelp: string;
     purchasePurposeOptions: Record<HomePurchasePurpose, string>;
-    /** Static remark explaining the fixed appreciation default, shown in
-     *  place of the (removed) appreciation slider. */
-    appreciationNote: (formattedPct: string) => string;
-    /** Static remark explaining the auto-calculated loan tenure, shown in
-     *  place of the (removed) loan-term picker. timelineYears is the
-     *  ceil(targetTimelineMonths / 12) figure the age gets pushed forward by
-     *  before checking the maturity cap — the loan originates at purchase,
-     *  not today, so the timeline counts against the cap too. */
-    loanTenureNote: (years: number, age: number, maxAge: number, timelineYears: number) => string;
-    /** Static disclosure of the other fixed lending assumptions (interest
-     *  rate, DSR, transaction costs) — previously shown on its own "Loan
-     *  preferences" step, now folded into the last step of the form. */
-    assumptionsNote: string;
   };
 
   results: {
     heading: string;
     editAnswers: string;
-    disclaimer: string;
 
     readiness: {
       eyebrow: string;
@@ -115,17 +125,22 @@ export interface Translations {
     purchasingPower: {
       eyebrow: string;
       title: string;
-      /** Estimated max affordable home price — a pure purchasing-power
-       *  figure (income, debt, loan capacity, available down-payment cash). */
+      /** Recommended Home Price — a pure purchasing-power figure (income,
+       *  debt, loan capacity, available down-payment cash), shown as the
+       *  fixed benchmark alongside the user's adjustable Target Home Price. */
       homeBudget: string;
       homeBudgetCaption: string;
       installment: string;
       perMonth: (formattedAmount: string) => string;
-      /** Third stat tile — the loan tenor (term) actually usable after the
-       *  age-based maturity cap, i.e. PurchasingPowerResult.effectiveLoanTermYears. */
-      loanTenure: string;
-      loanTenureValue: (years: number) => string;
-      loanTenureCaption: (age: number, maxAge: number, timelineYears: number) => string;
+      /** Static note under the installment stat — every Buy calculation
+       *  assumes BUY_LOAN_TENURE_YEARS (30), so this is no longer a
+       *  variable, age-derived figure worth its own stat tile. */
+      installmentTenureNote: (years: number) => string;
+      /** Label + helper for the adjustable "Your Target Home Price"
+       *  slider/input, which replaced the (removed) form-step slider — see
+       *  ResultsDashboard, which owns this live value. */
+      targetPriceLabel: string;
+      targetPriceHelp: string;
       zoneBarLabel: string;
       yourTarget: (formattedPrice: string) => string;
       safeUpTo: (formatted: string) => string;
@@ -152,44 +167,156 @@ export interface Translations {
     gapAndPlan: {
       eyebrow: string;
       title: string;
+      /** Which scenario's gap/plan is currently shown — selected by
+       *  clicking a card in the Rent/RTO/Buy comparison above, not by a
+       *  control here (see GapAndPlan.tsx and BuyVsRentComparison.tsx). */
+      scenarioLabels: Record<GapPlanScenario, string>;
+      /** Subtitle naming the active scenario next to the section title,
+       *  e.g. "Buy". */
+      showingLabel: (scenarioLabel: string) => string;
+      /** "The gap" card eyebrow — one consolidated card listing all three
+       *  upfront gaps below, always shown side by side (never summed into
+       *  one number, since they measure different constraints and may
+       *  overlap — see calculateBuyGapNarrative). */
       gapLabel: string;
-      /** Shown when purchasingPower.isPriceGapClosed is true. */
-      gapReady: string;
-      /** purchasingPower.priceGap framing: "does my loan-approved budget
-       *  reach the target price," not a cash-at-closing question. */
-      gapShort: (formattedGap: string, formattedTarget: string) => string;
+      gapItems: {
+        homePrice: {
+          label: string;
+          /** formattedPrice names whichever basis (Recommended Home Price
+           *  or Target Home Price) is currently selected. Reads correctly
+           *  at ฿0 too ("the additional ... needed" is simply none). */
+          detail: (formattedPrice: string) => string;
+        };
+        downPayment: {
+          label: string;
+          detail: string;
+        };
+        transactionFees: {
+          label: string;
+          detail: string;
+        };
+      };
+      /** "The plan" card — one bullet per gapItems entry above, each
+       *  independently switching between its `ready` copy (nothing to do)
+       *  and its `action` copy (the lever + amount), since a home price
+       *  price gap and a down payment gap can close independently of one
+       *  another. */
       planLabel: string;
-      /** Shown when purchasingPower.isPriceGapClosed is true. */
-      planReady: string;
-      /** Plan option 1 — additionalDownPaymentNeeded. */
-      planOptionDownPayment: (formattedAmount: string) => string;
-      /** Plan option 2 — additionalMonthlyInstallmentNeeded +
-       *  requiredMonthlyInstallmentForTarget. */
-      planOptionInstallment: (formattedAdditional: string, formattedTotal: string) => string;
-      /** Always-shown reminder (not conditional, unlike the suggestions
-       *  below) that transfer + mortgage-registration fees are a real cash
-       *  cost on top of the down payment — shown at both the estimated
-       *  home budget (maxHomePrice) and the target home price, since the
-       *  actual fee depends on which price the buyer ends up at. */
-      transactionFeeNoteLabel: string;
-      transactionFeeNote: (
-        formattedFeeAtAffordable: string,
-        formattedAffordablePrice: string,
-        formattedFeeAtTarget: string,
-        formattedTargetPrice: string,
-      ) => string;
-      alternativesLabel: string;
+      planItems: {
+        homePrice: {
+          label: string;
+          ready: string;
+          /** additionalMonthlyInstallmentNeeded, requiredMonthlyInstallmentForTarget. */
+          action: (formattedAdditional: string, formattedTotal: string) => string;
+        };
+        downPayment: {
+          label: string;
+          ready: string;
+          /** remainingDownPayment. */
+          action: (formattedAmount: string) => string;
+        };
+        transactionFees: {
+          label: string;
+          /** transactionCostEstimate — always an action (there's no "ready"
+           *  state for a cost you must simply set aside). */
+          action: (formattedAmount: string) => string;
+        };
+      };
+      /** Heading above downsizeSuggestion — kept visually secondary to the
+       *  three main plan bullets above (see GapAndPlan.tsx). */
+      additionalOptionLabel: string;
       suggestions: {
         /** [fact, suggestion] — two separate bullet points (the gap itself,
          *  then what to do about it), rather than one combined sentence. */
         overRiskBudget: (formattedAmount: string) => [string, string];
         stretchZone: [string, string];
-        noSavingPlan: string;
-        comfortLimited: string;
-        lowEmergencyCushion: (formattedAmount: string) => string;
       };
-      keepInMindLabel: string;
-      keepInMindText: string;
+      /** RTO tab content. Three DISTINCT concepts, deliberately kept visually
+       *  and conceptually separate (see RtoContent in GapAndPlan.tsx):
+       *    1. homePrice — the shared Buy/RTO affordability benchmark (Buy's
+       *       OWN priceGap/homePriceBasis from calculateBuyGapNarrative,
+       *       reused verbatim, including the Additional Option/
+       *       downsizeSuggestion — Buy and RTO share one financial-
+       *       eligibility ceiling, see RtoGapPlanResult's docstring). GAP
+       *       card only — informational context, not a row in THE PLAN:
+       *       there is no RTO-specific lever that closes it (closing it
+       *       means more loan capacity, which is Buy's own action, shown
+       *       under the Buy tab).
+       *    2. contractFee — RTO's own upfront-cash row (the RTO parallel to
+       *       Buy's down payment gap), from RtoGapPlanResult.
+       *    3. monthlyShortfall — RTO's own Years 1-3 payment-feasibility
+       *       row, from RtoGapPlanResult.hasMonthlyShortfall/
+       *       monthlyShortfallTHB (computed from the household's cash flow
+       *       against RTO's actual monthly payment — see
+       *       calculateRtoGapPlan — never Buy's installment math). Same
+       *       "only shown when there's an actual shortfall" convention as
+       *       rent.gapItems/planItems.monthlyShortfall below. */
+      rto: {
+        gapItems: {
+          /** Amount/detail come from Buy's own calculateBuyGapNarrative
+           *  (priceGap, homePriceBasis) — not a separate RTO calculation. */
+          homePrice: { label: string; detail: (formattedPrice: string) => string };
+          contractFee: { label: string; detail: string };
+          /** Only rendered when hasMonthlyShortfall — a healthy monthly
+           *  cushion isn't a "gap" (same convention as rent.gapItems
+           *  .monthlyShortfall). */
+          monthlyShortfall: { label: string; detail: string };
+        };
+        planItems: {
+          contractFee: {
+            label: string;
+            /** Shown when isContractFeeGapClosed. */
+            ready: string;
+            /** Shown when monthsToCloseContractFeeGap is a number. */
+            action: (formattedGap: string, months: number) => string;
+            /** Shown instead of `action` when monthsToCloseContractFeeGap is
+             *  null (the household's saving capacity is $0/mo against a real
+             *  gap). */
+            notAchievable: string;
+          };
+          /** Only rendered alongside gapItems.monthlyShortfall. */
+          monthlyShortfall: {
+            label: string;
+            action: (formattedShortfall: string) => string;
+          };
+        };
+      };
+      /** Rent tab content — no bank approval and no minimum-equity
+       *  requirement like Buy, but renting does have a real upfront cash
+       *  requirement (the 2-month deposit — see RentGapPlanResult), plus the
+       *  same ongoing monthly-affordability question every option has. No
+       *  additional option (there's no downsize-style lever this app models
+       *  for rent). */
+      rent: {
+        gapItems: {
+          /** Always shown, like Buy's/RTO's own required-cash rows — ฿0
+           *  reads fine ("you already have enough"). */
+          rentalDeposit: { label: string; detail: string };
+          /** Only rendered when hasMonthlyShortfall — a healthy monthly
+           *  cushion isn't a "gap," so it's never shown just to pad the
+           *  card out to match Buy/RTO's row count. */
+          monthlyShortfall: { label: string; detail: string };
+        };
+        planItems: {
+          rentalDeposit: {
+            label: string;
+            /** Shown when isRentalDepositReady. */
+            ready: (formattedRequired: string) => string;
+            /** Shown when there's a gap and monthsToCloseRentalDepositGap
+             *  is a number. */
+            action: (formattedRequired: string, formattedGap: string, months: number) => string;
+            /** Shown instead of `action` when monthsToCloseRentalDepositGap
+             *  is null (the household's saving capacity is $0/mo against a
+             *  real gap). */
+            notAchievable: (formattedRequired: string, formattedGap: string) => string;
+          };
+          /** Only rendered alongside gapItems.monthlyShortfall. */
+          monthlyShortfall: {
+            label: string;
+            action: (formattedShortfall: string) => string;
+          };
+        };
+      };
     };
 
     buyVsRent: {
@@ -197,9 +324,11 @@ export interface Translations {
       title: string;
 
       /** Toggle governing every number in this section: whichever home
-       *  price basis is selected (the suggested home budget, or the user's
-       *  stated target price) is what RTO, monthly cash flow, and the
-       *  10-year value all get computed from — see BuyVsRentOption. */
+       *  price basis is selected (Recommended Home Price, or the user's
+       *  adjustable Target Home Price) is what the value highlight, the
+       *  three comparison cards, and the footnotes all get computed from —
+       *  see BuyVsRentOption. Gap & Plan is NOT affected by this toggle; it
+       *  always stays anchored to the target price (see GapAndPlan.tsx). */
       basisToggle: {
         label: string;
         budgetOption: (formattedPrice: string) => string;
@@ -207,46 +336,40 @@ export interface Translations {
       };
 
       /** Section 1 — the page's primary visual focus: the selected basis
-       *  price vs. its estimated value after 10 years of compounding
-       *  appreciation. A structural fact about buying, so this swaps out
-       *  for `rentNote` / `rentToOwnNote` while a different slide is active
-       *  — renting builds no equivalent asset, by definition, and
-       *  Rent-to-Own builds toward ownership on its own (RTO-sourced)
-       *  terms, so showing the buy-side value figure on those slides would
-       *  misleadingly imply otherwise. (Deliberately no equity figure
-       *  alongside the value: mixing a pure appreciation number with a
-       *  loan-amortization-dependent one in the same headline was found
-       *  confusing.) */
+       *  price today vs. its estimated value at year 10. IDENTICAL whether
+       *  Buy or RTO is selected — a home's market value depends on the home
+       *  itself, not on how it's financed, so the RTO markup never inflates
+       *  this figure (see RentToOwnResult.projectedHomeValueYear10THB).
+       *  Hidden entirely for Rent — renting builds no equivalent asset, by
+       *  definition. */
       valueHighlight: {
         eyebrow: string;
         /** Label above the "today" figure — depends on which basisToggle
-         *  option is selected, so it never says "Estimated home budget"
+         *  option is active, so it never says "Recommended Home Price"
          *  while actually showing the target price, or vice versa. */
         todayLabelBudget: string;
         todayLabelTarget: string;
         futureLabel: string;
-        /** Lowercase noun phrases ("your suggested home budget" / "your
+        /** Lowercase noun phrases ("the recommended home price" / "your
          *  target home price") interpolated into growthNote below. */
         basisLabelBudget: string;
         basisLabelTarget: string;
         growthNote: (formattedPrice: string, formattedAppreciationPct: string, basisLabel: string) => string;
-        /** Shown in place of the value figures while the Rent slide is active. */
-        rentNote: string;
-        /** Shown in place of the value figures while the Rent-to-Own slide
-         *  is active — the "path toward ownership" figure, sourced from
-         *  RentToOwnResult.paidTowardPriceAfter3YearsTHB. */
-        rentToOwnNote: (formattedPaidDown: string) => string;
       };
 
-      /** Section 2 — one scenario at a time (Rent, Rent-to-Own, Buy),
-       *  swiped/dragged between. Each slide is self-contained: housing
-       *  payment, remaining cash flow, status badge, a supporting
-       *  description, and a per-scenario income allocation bar (living
-       *  expenses + debt are identical across all three scenarios; housing
-       *  and remaining are the lines that actually differ — see
-       *  CashFlowBreakdown). */
+      /** Section 2 — Rent, Rent-to-Own, and Buy shown side by side (a
+       *  responsive grid: 3 columns on wider screens, stacked on mobile).
+       *  Each card is clickable — selecting one is how the Gap & Plan
+       *  section below chooses which scenario to narrate (see
+       *  GapAndPlan.tsx). */
       comparisonTitle: string;
-      swipeHint: string;
+      /** Instructional caption above the cards. */
+      selectHint: string;
+      /** Top-left header cell of the desktop comparison table — labels the
+       *  leftmost column, which holds every row's label. */
+      optionColumnLabel: string;
+      /** Badge shown on whichever card is currently selected. */
+      selectedBadge: string;
       scenarioRent: string;
       scenarioRentToOwn: string;
       scenarioBuy: string;
@@ -257,74 +380,109 @@ export interface Translations {
         rentToOwn: string;
         buy: string;
       };
-      /** Per-scenario label for the housing-payment line/tile — "housing
-       *  payment" reads oddly for a scenario that's literally rent, so each
-       *  scenario names its own payment. */
-      housingPaymentLabels: {
-        rent: string;
-        rentToOwn: string;
-        buy: string;
-      };
       metrics: {
+        cushionStatusLabels: Record<CashFlowRiskLevel, string>;
+        /** Section title grouping the 5 metric rows below (Initial payment
+         *  through Capital value), mirroring nonFinancial.title's role for
+         *  the pillar rows. */
+        sectionTitle: string;
+        initialPaymentLabel: string;
+        /** Per-scenario caption under the Initial Payment figure, naming
+         *  what it actually is (down payment + fees / contract fee / 2
+         *  months' rent). */
+        initialPaymentCaptions: Record<"buy" | "rentToOwn" | "rent", string>;
+        monthlyPaymentLabel: string;
+        /** RTO-only caption under the Monthly Payment figure, explaining the
+         *  two payment phases (see RentToOwnResult): the figure shown is the
+         *  flat RTO payment during the 3-year contract, then this caption
+         *  names the estimated mortgage installment (postTransitionMonthlyPaymentTHB,
+         *  pre-formatted as THB) the household transitions to afterward. Not
+         *  used for Buy/Rent — their monthly payment is a single flat figure
+         *  for all 10 years, so no phase to explain. */
+        rentToOwnMonthlyPaymentCaption: (formattedPostTransitionAmount: string) => string;
         remainingLabel: string;
         remainingPctCaption: (pct: string) => string;
-        cushionStatusLabels: Record<CashFlowRiskLevel, string>;
-        income: string;
-        /** Hover/focus popup on "Money left over each month" — dynamically
-         *  names the actual biggest driver(s) behind that scenario's
-         *  number, computed from the user's own income/housing/living/debt
-         *  figures rather than a generic message. */
-        remainingExplanation: {
-          /** aria-label for the trigger. */
-          infoLabel: string;
-          /** No housing, living, or debt cost at all — a rare edge case. */
-          noExpenses: string;
-          shortfall: (formattedShortfall: string, topFactorLabel: string, topFactorPct: string) => string;
-          shortfallWithSecond: (
-            formattedShortfall: string,
-            topFactorLabel: string,
-            topFactorPct: string,
-            secondFactorLabel: string,
-            secondFactorPct: string,
-          ) => string;
-          tight: (topFactorLabel: string, topFactorPct: string) => string;
-          tightWithSecond: (
-            topFactorLabel: string,
-            topFactorPct: string,
-            secondFactorLabel: string,
-            secondFactorPct: string,
-          ) => string;
-          comfortable: (topFactorLabel: string, remainingPct: string) => string;
+        /** "Total paid over 10 years" — a pure cost figure (see
+         *  CashFlowBreakdown.totalPaidOver10YearsTHB), deliberately never
+         *  netted against Capital Value below so the two rows answer two
+         *  different questions: money paid out vs. equity built. No
+         *  standalone help caption — tooltips.totalPaid covers it. */
+        totalPaidLabel: string;
+        capitalValueLabel: string;
+        /** No "Yes"/"No" wording — the ✓/✕ icon (rendered separately)
+         *  already carries that signal; this text just names the actual
+         *  built-up value in plain language. Used for both Buy and RTO —
+         *  both are now genuine year-10 projections (see
+         *  RentToOwnResult.projectedHomeValueYear10THB). */
+        capitalValueYes: (formattedAmount: string) => string;
+        capitalValueNo: string;
+        /** Click/tap-to-open explanations for the (i) icon next to each of
+         *  the 5 Financial Snapshot row labels — see InfoTooltip in
+         *  BuyVsRentComparison.tsx. Generic, scenario-independent
+         *  explanations of what each metric means (the per-scenario
+         *  captions above already cover the scenario-specific detail). */
+        tooltips: {
+          initialPayment: string;
+          monthlyPayment: string;
+          remaining: string;
+          totalPaid: string;
+          capitalValue: string;
         };
       };
-      /** Per-scenario income breakdown: income at the center, its major
-       *  outflows (living expenses, housing, debt) as supporting tiles. */
-      allocation: {
+      /** Section 3 — non-financial pillars: short, neutral, per-scenario
+       *  copy, not calculated from any number. */
+      nonFinancial: {
         title: string;
-        livingExpenses: string;
-        debt: string;
+        flexibilityLabel: string;
+        barrierToEntryLabel: string;
+        debtRiskLabel: string;
+        pillars: Record<
+          "rent" | "rentToOwn" | "buy",
+          { flexibility: string; barrierToEntry: string; debtRisk: string }
+        >;
+        /** Click/tap-to-open explanations for the (i) icon next to each of
+         *  the 3 Non-Financial row labels — same InfoTooltip pattern as
+         *  metrics.tooltips above. Generic, scenario-independent
+         *  explanations of what each pillar means (the per-scenario
+         *  sentences in `pillars` above already cover the scenario-specific
+         *  detail). No tooltip on the "Non-Financial" section title itself —
+         *  that (i) icon was removed as purely decorative and confusing
+         *  (it had no popup). */
+        tooltips: {
+          flexibility: string;
+          barrierToEntry: string;
+          debtRisk: string;
+        };
       };
-      previousCard: string;
-      nextCard: string;
 
-      /** Section 4 — neutral 3-way recap. Never frames any option as the
-       *  "winner"; states each option's own key trade-off (grounded in that
-       *  option's real monthly payment) and leaves the choice to the
-       *  reader's own priorities. */
-      recommendation: {
-        eyebrow: string;
-        rentSummary: (formattedPayment: string) => string;
-        rentToOwnSummary: (formattedPayment: string) => string;
-        buySummary: (formattedPayment: string) => string;
-      };
+    };
 
-      /** basisLabel: same lowercase noun phrase as valueHighlight.basisLabelBudget
-       *  / basisLabelTarget — this footnote must name whichever basis is
-       *  actually active, not hardcode "target home price". */
-      rentEstimateNote: (formattedYield: string, formattedRent: string, basisLabel: string) => string;
-      /** Footnote disclosing the Rent-to-Own assumptions, analogous to
-       *  rentEstimateNote — sourced from RTO-Payment.xlsx. */
-      rentToOwnEstimateNote: (formattedContractFee: string, formattedMarkupPct: string, basisLabel: string) => string;
+    /** The one and only Notes section in the app — every assumption,
+     *  disclaimer, and important context the calculations rely on,
+     *  consolidated into a single list at the very bottom of the results
+     *  page (see NotesSection.tsx). Previously scattered across the Home
+     *  Goals form step (loanTenureNote/appreciationNote/assumptionsNote,
+     *  now removed) and several results footnotes (rentEstimateNote,
+     *  rentToOwnEstimateNote, gapAndPlan.keepInMindText, the standalone
+     *  disclaimer — all now removed/merged here instead). */
+    notes: {
+      title: string;
+      disclaimer: string;
+      /** Merges the old loanTenureNote + assumptionsNote — every fixed
+       *  lending assumption a Buy calculation uses, values interpolated
+       *  live from BUY_LOAN_TENURE_YEARS and the active assumptions (so
+       *  this stays accurate even when Master mode tunes them, unlike the
+       *  old assumptionsNote which hardcoded "6%"/"40%"/"2%" as plain
+       *  text regardless of the actual active values). */
+      buyAssumptions: (tenureYears: number, interestPct: string, dsrPct: string, feePct: string) => string;
+      /** Merges the old rentEstimateNote + rentToOwnEstimateNote, dropping
+       *  the derived THB amounts (already shown live in the Financial
+       *  Snapshot table) and keeping just the assumption rates themselves. */
+      rentAndRtoAssumptions: (yieldPct: string, rtoMarkupPct: string, rtoFeePct: string) => string;
+      /** The old homeGoals.appreciationNote. */
+      growthAssumption: (appreciationPct: string) => string;
+      /** The old gapAndPlan.keepInMindText — kept verbatim, just relocated. */
+      governmentSchemes: string;
     };
   };
 
