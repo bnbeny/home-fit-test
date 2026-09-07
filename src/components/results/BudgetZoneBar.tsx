@@ -1,7 +1,11 @@
-import { useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent as ReactChangeEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { formatTHB } from "../../lib/calculations";
 import { useLanguage } from "../../i18n/LanguageContext";
+
+const MILLION = 1_000_000;
+/** ${targetHomePrice} in millions, to 2 decimal places — e.g. 3030000 -> "3.03". */
+const toMillionsInput = (value: number) => (value / MILLION).toFixed(2);
 
 interface BudgetZoneBarProps {
   safeBudget: number;
@@ -59,6 +63,27 @@ export function BudgetZoneBar({
   const copy = t.results.purchasingPower;
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // The millions-input's own displayed text, decoupled from targetHomePrice
+  // while focused — otherwise re-deriving it from targetHomePrice on every
+  // keystroke (e.g. via toMillionsInput) would eat a trailing "." the
+  // instant it's typed, making a decimal point impossible to enter. Synced
+  // FROM targetHomePrice whenever it changes for any other reason (dragging
+  // the marker, arrow keys) while this input isn't focused.
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [targetDraft, setTargetDraft] = useState(() => toMillionsInput(targetHomePrice));
+  useEffect(() => {
+    if (!isEditingTarget) setTargetDraft(toMillionsInput(targetHomePrice));
+  }, [targetHomePrice, isEditingTarget]);
+
+  const onTargetInputChange = (e: ReactChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setTargetDraft(raw);
+    const millions = Number(raw);
+    if (Number.isFinite(millions)) {
+      onTargetHomePriceChange(clamp(Math.round(millions * MILLION), min, max));
+    }
+  };
 
   const scaleMax = Math.max(riskZoneThreshold * 1.15, targetHomePrice * 1.05, 1);
   const toPct = (value: number) => (value / scaleMax) * 100;
@@ -145,12 +170,30 @@ export function BudgetZoneBar({
           />
         </div>
 
-        <p
-          className="tabular-figure absolute top-9 -translate-x-1/2 whitespace-nowrap text-xs font-semibold text-ink"
+        <div
+          className="absolute top-9 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap text-xs font-semibold text-ink"
           style={{ left: `${labelLeft}%` }}
         >
-          {copy.yourTarget(formatTHB(targetHomePrice))}
-        </p>
+          <span>{copy.targetPricePrefix}</span>
+          <span aria-hidden="true">฿</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={targetDraft}
+            onChange={onTargetInputChange}
+            onFocus={(e) => {
+              setIsEditingTarget(true);
+              e.target.select();
+            }}
+            onBlur={() => {
+              setIsEditingTarget(false);
+              setTargetDraft(toMillionsInput(targetHomePrice));
+            }}
+            aria-label={copy.targetPriceLabel}
+            className="tabular-figure w-16 rounded border border-black/15 bg-surface px-1.5 py-0.5 text-right text-xs font-semibold text-ink focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+          />
+          <span aria-hidden="true">M</span>
+        </div>
       </div>
 
       <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs">
@@ -160,7 +203,7 @@ export function BudgetZoneBar({
         </li>
         <li className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-brand-mandarin" aria-hidden="true" />
-          <span className="text-ink-muted">{copy.stretchUpTo(formatTHB(riskZoneThreshold))}</span>
+          <span className="text-ink-muted">{copy.stretchUpTo(formatTHB(safeBudget), formatTHB(riskZoneThreshold))}</span>
         </li>
         <li className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-brand-critical/70" aria-hidden="true" />

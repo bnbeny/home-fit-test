@@ -142,9 +142,16 @@ export interface Translations {
       targetPriceLabel: string;
       targetPriceHelp: string;
       zoneBarLabel: string;
-      yourTarget: (formattedPrice: string) => string;
+      /** Prefix shown next to the editable Target Home Price input floating
+       *  above the budget bar's marker — e.g. "Your target:" ฿[input]. The
+       *  input itself is a plain number field (raw digits, no compact ฿/M
+       *  formatting) so it can be typed into directly — see BudgetZoneBar. */
+      targetPricePrefix: string;
       safeUpTo: (formatted: string) => string;
-      stretchUpTo: (formatted: string) => string;
+      /** Shown as an explicit low-high range (safeBudget-riskZoneThreshold),
+       *  not a one-sided "up to" figure — see BudgetZoneBar's legend, which
+       *  passes both bounds. */
+      stretchUpTo: (low: string, high: string) => string;
       riskAbove: (formatted: string) => string;
       /** One-sentence reason the recommended installment landed where it
        *  did — rendered directly under that stat's value. Three-way, since

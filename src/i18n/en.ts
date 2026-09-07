@@ -2,14 +2,14 @@ import type { Translations } from "./types";
 
 export const en: Translations = {
   header: {
-    eyebrow: "Home Ready",
+    eyebrow: "YOUR DREAM HOME STARTS HERE!",
     title: "Smart Home Budget Calculator",
     subtitle:
-      "Answer a few questions about your income, savings, and goals to see how ready you are to buy your target home — and exactly what to do next.",
+      "Tell us a little about your income, savings, and dream home. We'll help you find a budget that feels right, see how ready you are, and plan your next step.",
   },
 
   footer: {
-    note: "Home Ready is an estimation tool, not a mortgage application. No data leaves your browser.",
+    note: "Home Ready gives you an estimate, not a mortgage application. Your data stays on your device — nothing is sent anywhere.",
   },
 
   common: {
@@ -22,8 +22,8 @@ export const en: Translations = {
     back: "Back",
     next: "Next",
     seeResults: "See my results",
-    incomeRequired: "Enter your monthly income to continue.",
-    priceRequired: "Enter a timeline to continue.",
+    incomeRequired: "Please enter your monthly income to continue.",
+    priceRequired: "Please enter a timeline to continue.",
   },
 
   income: {
@@ -32,59 +32,59 @@ export const en: Translations = {
     displayModeAnnual: "Annual",
     primary: "Primary income",
     primaryHelp:
-      "Take-home pay from your main job — not your co-borrower's; enter their income in the Co-borrower section below.",
+      "Your take-home pay from your main job. If you have a co-borrower, enter their income separately below.",
     additional: "Additional income",
     additionalHelp:
-      "Other steady income of your own — side income, freelance work, or rental income. Not your co-borrower's; enter theirs in the Co-borrower section below.",
+      "Any other steady income you earn — side jobs, freelance work, or rental income. If you have a co-borrower, enter theirs separately below.",
     bonus: "Annual bonus",
     bonusHelp:
-      "Your own bonus, if any — banks typically count only part of this toward what they'll lend. A co-borrower's bonus isn't captured separately in this calculator.",
+      "Your yearly bonus, if you get one — banks usually count only part of it when deciding how much to lend. (There's no separate field yet for a co-borrower's bonus.)",
     coBorrowerSectionLabel: "Co-borrower (optional)",
     coBorrower: "Co-borrower income",
     coBorrowerHelp:
-      "A co-borrower's regular monthly income, if you're applying together. Counted the same as your own regular income.",
+      "If you're buying together, your co-borrower's regular monthly income. We count it the same as your own.",
   },
 
   debt: {
     homeLoan: "Existing home loan payment",
     homeLoanHelp:
-      "Monthly payment on a home loan you already have, if any — not your co-borrower's; enter theirs under Co-borrower debt below.",
+      "Your monthly payment on a home loan you already have, if any. Enter your co-borrower's separately below.",
     otherDebt: "Other loan payments",
     otherDebtHelp:
-      "Car loan, credit cards, personal loans — anything else with a fixed monthly payment of your own. Not your co-borrower's; enter theirs under Co-borrower debt below.",
+      "Car loans, credit cards, personal loans — any other fixed monthly payments of your own. Enter your co-borrower's separately below.",
     coBorrowerSectionLabel: "Co-borrower (optional)",
     coBorrowerDebt: "Co-borrower debt",
     coBorrowerDebtHelp:
-      "Home loan, car loan, credit cards, personal loans — anything with a fixed monthly payment, but for your co-borrower.",
+      "Your co-borrower's home loan, car loan, credit cards, or any other fixed monthly payments.",
   },
 
   expenses: {
     livingExpenses: "Monthly living expenses",
     livingExpensesHelp:
-      "Food, utilities, transport, and other regular costs — not including rent. Include regular living expenses for both you and your co-borrower, if applicable.",
+      "Food, utilities, transport, and other everyday costs — not including rent. Include both you and your co-borrower's expenses, if you have one.",
     annualLumpSum: "Annual lump-sum expenses",
     annualLumpSumHelp:
-      "Insurance premiums, car insurance, and other yearly costs — we'll spread this across 12 months. Include yearly costs for both you and your co-borrower, if applicable.",
+      "Insurance premiums and other yearly costs — we'll spread these evenly across 12 months. Include both you and your co-borrower's costs, if you have one.",
     isRentingQuestion: "Are you currently renting?",
     rent: "Monthly rent",
-    rentHelp: "Kept separate from your other living expenses.",
+    rentHelp: "We keep this separate from your other living expenses.",
   },
 
   savings: {
     totalSavings: "Total current savings",
     totalSavingsHelp:
-      "All savings, including money earmarked for other goals. Include your co-borrower's savings too if you're pooling funds together.",
+      "All the savings you have right now, including money set aside for other goals. Include your co-borrower's savings too if you're pooling funds.",
     downPayment: "Available for a down payment",
     downPaymentHelp:
-      "Cash you'd actually put toward the home, after keeping an emergency fund untouched. Combine yours and your co-borrower's contribution if applying together.",
+      "The cash you'd actually put toward the home, after keeping your emergency fund untouched. Combine yours and your co-borrower's contribution if applying together.",
   },
 
   aboutYou: {
     age: "Your age",
-    ageHelp: "Doesn't change the numbers on your results page — it's just context for how a lender may view your application.",
+    ageHelp: "This won't change any of your numbers — it's just extra context for how a lender may view your application.",
     employmentType: "Employment type",
     employmentTypeHelp:
-      "Doesn't change the numbers on your results page — it's just context for how a lender may view your application.",
+      "This won't change any of your numbers — it's just extra context for how a lender may view your application.",
     employmentTypeOptions: {
       "government-state-enterprise": "Government / State Enterprise Employee",
       permanent: "Permanent Employee",
@@ -97,12 +97,11 @@ export const en: Translations = {
   },
 
   homeGoals: {
-    timeline: "Timeline to buy",
+    timeline: "When do you want to buy?",
     timelineHelp: (years) => `About ${years} year(s) from now.`,
     monthsUnit: (months) => `${months} mo`,
-    purchasePurpose: "What is your primary goal for buying this home?",
-    purchasePurposeHelp:
-      "Doesn't change the numbers on your results page — it's just context for your plan.",
+    purchasePurpose: "Why are you buying this home?",
+    purchasePurposeHelp: "This won't change any of your numbers — it's just extra context for your plan.",
     purchasePurposeOptions: {
       "live-in": "Live in long-term",
       investment: "Investment / Resale",
@@ -114,7 +113,7 @@ export const en: Translations = {
     editAnswers: "Edit answers",
 
     readiness: {
-      eyebrow: "Home readiness score",
+      eyebrow: "Your target home readiness score",
       statusLabels: {
         ready: "Ready",
         "almost-ready": "Almost Ready",
@@ -131,37 +130,36 @@ export const en: Translations = {
 
     purchasingPower: {
       eyebrow: "Your purchasing power",
-      title: "What you can afford",
-      homeBudget: "Recommended home price",
-      homeBudgetCaption:
-        "Based on how much loan your recommended installment can support, plus your available down payment.",
+      title: "The home budget that fits you",
+      homeBudget: "Recommended home budget",
+      homeBudgetCaption: "Estimated from your income, debt, and repayment ability, assuming the standard 10% minimum down payment.",
       installment: "Recommended monthly installment",
       perMonth: (formattedAmount) => `${formattedAmount}/mo`,
-      installmentTenureNote: (years) => `Based on a ${years}-year loan tenure.`,
+      installmentTenureNote: (years) => `over a ${years}-year loan tenure.`,
       targetPriceLabel: "Your target home price",
-      targetPriceHelp: "Drag to update your Gap, Plan, and comparison below.",
-      zoneBarLabel: "Where your target home price falls",
-      yourTarget: (formattedPrice) => `Your target: ${formattedPrice}`,
-      safeUpTo: (formatted) => `Safe up to ${formatted}`,
-      stretchUpTo: (formatted) => `Stretch up to ${formatted}`,
-      riskAbove: (formatted) => `Risk zone above ${formatted}`,
+      targetPriceHelp: "Try adjusting your target price to see how far it is from your recommended budget — and what you'd need to plan for.",
+      zoneBarLabel: "Where does your target home price land?",
+      targetPricePrefix: "Price you've set:",
+      safeUpTo: (formatted) => `Comfortable up to ${formatted}`,
+      stretchUpTo: (low, high) => `Tight ${low}–${high}`,
+      riskAbove: (formatted) => `Risk above ${formatted}`,
       installmentRationale: {
         dsrBinding: (dsr) =>
-          `This is the bank's standard debt-service limit of ${dsr}/month, based on your income and existing debt.`,
+          `Based on your income and debt, we estimate the installment shouldn't exceed ${dsr}/month,`,
         budgetBinding: (budget) =>
-          `This reflects what's realistically left in your monthly budget after living costs and debt — ${budget}/month — tighter than a bank's standard limit.`,
-        comfortBinding: (comfortable, nextCeiling) =>
-          `We've based this on your comfortable payment limit of ${comfortable} to help maintain financial flexibility. Your bank/budget ceiling would allow up to ${nextCeiling}/month.`,
+          `Based on your income and debt, we estimate the installment shouldn't exceed ${budget}/month,`,
+        comfortBinding: (comfortable, _nextCeiling) =>
+          `Based on your income and debt, we estimate the installment shouldn't exceed ${comfortable}/month,`,
       },
     },
 
     advisoryNotices: {
       eyebrow: "Worth flagging",
-      title: "Advisory notices",
-      note: "These don't change the numbers above — they're real factors a lender will weigh, so it's worth raising them directly.",
+      title: "A few things to keep in mind",
+      note: "These won't change the numbers above, but they're real things a lender will weigh — worth being upfront about.",
       items: {
         "negative-cash-flow": (formattedAmount) =>
-          `Based on what you've told us, your monthly obligations currently exceed your income by about ${formattedAmount} — the numbers below may be optimistic until this is resolved.`,
+          `Right now, your monthly expenses are about ${formattedAmount} more than your income — the numbers below may look better than they really are until this is sorted out.`,
       },
     },
 
@@ -179,75 +177,75 @@ export const en: Translations = {
         homePrice: {
           label: "Home price gap",
           detail: (formattedPrice) =>
-            `The extra purchasing power you'd need to reach a home price of ${formattedPrice}, based on how much you can borrow plus the down payment you have available.`,
+            `The extra purchasing power you'd need to reach a home price of ${formattedPrice}, based on your current financial capacity.`,
         },
         downPayment: {
           label: "Down payment gap",
-          detail: "The extra cash you'd need to meet the minimum down payment required for this price.",
+          detail: "The extra cash you'd need to cover the minimum down payment for this price.",
         },
         transactionFees: {
           label: "Transaction fees",
-          detail: "Estimated transfer and registration costs — additional cash to prepare on top of your down payment.",
+          detail: "Estimated transfer and registration fees — extra cash to have ready on top of your down payment.",
         },
       },
       planLabel: "The plan",
       planItems: {
         homePrice: {
           label: "Close the home price gap",
-          ready: "You already have enough purchasing power for this price.",
+          ready: "Good news — you already have enough purchasing power for this price.",
           action: (formattedAdditional, formattedTotal) =>
-            `Increase your monthly installment capacity by about ${formattedAdditional} (to about ${formattedTotal} total) — through higher income, lower existing debt, or a longer loan term.`,
+            `Boost your monthly installment capacity by about ${formattedAdditional} (to about ${formattedTotal} total) — through higher income, lower debt, or a longer loan term.`,
         },
         downPayment: {
           label: "Complete your down payment",
-          ready: "You already have enough saved for the minimum down payment.",
-          action: (formattedAmount) => `Save an additional ${formattedAmount} to meet the minimum down payment for this price.`,
+          ready: "You've already saved enough for the minimum down payment.",
+          action: (formattedAmount) => `Save ${formattedAmount} more to reach the minimum down payment for this price.`,
         },
         transactionFees: {
           label: "Prepare for transaction fees",
-          action: (formattedAmount) => `Set aside about ${formattedAmount} for transfer and registration costs, separate from your down payment.`,
+          action: (formattedAmount) => `Set aside about ${formattedAmount} for transfer and registration fees — on top of your down payment.`,
         },
       },
       additionalOptionLabel: "Additional option",
       suggestions: {
         overRiskBudget: (formattedAmount) => [
           `This home price is about ${formattedAmount} above your Stretch Budget — the top of your recommended range.`,
-          "Consider nearby neighborhoods, a smaller unit, or a longer loan term to lower the monthly installment.",
+          "Try a nearby neighborhood, a smaller unit, or a longer loan term to bring the monthly payment down.",
         ],
         stretchZone: [
-          "This home price sits in the stretch zone — it's reachable, but leaves little room for rate increases or surprise costs.",
-          "A slightly lower price point would add breathing room.",
+          "This home price is in the stretch zone — doable, but leaves little room for rate hikes or surprise costs.",
+          "A slightly lower price would give you more breathing room.",
         ],
       },
       rto: {
         gapItems: {
           homePrice: {
-            label: "Home price gap (shared eligibility check with Buy)",
+            label: "Home price gap (same check as Buy)",
             detail: (formattedPrice) =>
-              `The extra purchasing power you'd need to reach a home price of ${formattedPrice}, based on your current financial capacity — the same check used for Buy.`,
+              `The extra purchasing power you'd need to reach a home price of ${formattedPrice}, based on your current financial capacity — same as the check for Buy.`,
           },
           contractFee: {
             label: "Upfront contract fee gap",
-            detail: "The extra cash needed to cover the Rent-to-Own contract fee due at signing.",
+            detail: "The extra cash you'd need to cover the Rent-to-Own contract fee, due when you sign.",
           },
           monthlyShortfall: {
-            label: "Monthly shortfall (during the 3-year RTO period)",
-            detail: "How much more you'd need each month to afford the Rent-to-Own payment during Years 1–3, before transitioning to a mortgage.",
+            label: "Monthly shortfall (first 3 years)",
+            detail: "How much more you'd need each month to cover the Rent-to-Own payment in Years 1–3, before it switches to a mortgage.",
           },
         },
         planItems: {
           contractFee: {
             label: "Complete your contract fee",
-            ready: "You already have enough available to cover the contract fee.",
+            ready: "You already have enough to cover the contract fee.",
             action: (formattedGap, months) =>
-              `Save an additional ${formattedGap}. At your current saving rate, this would take about ${months} month(s).`,
+              `Save ${formattedGap} more. At your current saving rate, that's about ${months} month(s).`,
             notAchievable:
-              "You haven't set a monthly saving amount, so this gap won't close on its own — set even a modest saving target to get a realistic timeline.",
+              "You haven't set a monthly saving amount, so this gap won't close by itself — set even a small saving goal to get a realistic timeline.",
           },
           monthlyShortfall: {
             label: "Close the monthly shortfall",
             action: (formattedShortfall) =>
-              `You'd be about ${formattedShortfall} short each month during the 3-year RTO period. Consider a lower home price, higher income, or lower existing debt.`,
+              `You'd be about ${formattedShortfall} short each month during the first 3 years. Consider a lower home price, higher income, or less existing debt.`,
           },
         },
       },
@@ -255,26 +253,26 @@ export const en: Translations = {
         gapItems: {
           rentalDeposit: {
             label: "Rental deposit gap",
-            detail: "The extra cash needed to cover the 2-month rental deposit.",
+            detail: "The extra cash you'd need for the 2-month rental deposit.",
           },
           monthlyShortfall: {
             label: "Monthly shortfall",
-            detail: "How much more you'd need each month to afford the rent for this home.",
+            detail: "How much more you'd need each month to cover the rent for this home.",
           },
         },
         planItems: {
           rentalDeposit: {
             label: "Prepare for the rental deposit",
-            ready: (formattedRequired) => `Set aside ${formattedRequired} for the 2-month deposit — you already have enough saved.`,
+            ready: (formattedRequired) => `Set aside ${formattedRequired} for the 2-month deposit — you've already saved enough.`,
             action: (formattedRequired, formattedGap, months) =>
-              `Set aside ${formattedRequired} for the 2-month deposit. Save an additional ${formattedGap} — at your current saving rate, this would take about ${months} month(s).`,
+              `Set aside ${formattedRequired} for the 2-month deposit. Save ${formattedGap} more — about ${months} month(s) at your current saving rate.`,
             notAchievable: (formattedRequired, formattedGap) =>
-              `Set aside ${formattedRequired} for the 2-month deposit. You still need ${formattedGap} more, but haven't set a monthly saving amount — set even a modest saving target to get a realistic timeline.`,
+              `Set aside ${formattedRequired} for the 2-month deposit. You still need ${formattedGap} more, but haven't set a monthly saving amount — set even a small goal to get a realistic timeline.`,
           },
           monthlyShortfall: {
             label: "Close the monthly shortfall",
             action: (formattedShortfall) =>
-              `You'd be about ${formattedShortfall} short each month. Consider a lower rent budget, higher income, or lower existing debt.`,
+              `You'd be about ${formattedShortfall} short each month. Consider a lower rent budget, higher income, or less existing debt.`,
           },
         },
       },
@@ -298,7 +296,7 @@ export const en: Translations = {
         basisLabelBudget: "the recommended home price",
         basisLabelTarget: "your target home price",
         growthNote: (formattedPrice, formattedAppreciationPct, basisLabel) =>
-          `Based on ${basisLabel} of ${formattedPrice}, growing at ${formattedAppreciationPct} expected annual capital growth over 10 years.`,
+          `Assuming ${basisLabel} of ${formattedPrice} grows ${formattedAppreciationPct} a year for 10 years.`,
       },
 
       comparisonTitle: "Compare rent, rent-to-own, and buy",
@@ -309,9 +307,9 @@ export const en: Translations = {
       scenarioRentToOwn: "Rent-to-Own",
       scenarioBuy: "Buy",
       scenarioNotes: {
-        rent: "Offers the most flexibility, with less commitment and the freedom to adjust your housing plans as life changes.",
-        rentToOwn: "Provides a gradual path toward homeownership, letting you live in the home while preparing to buy.",
-        buy: "Provides immediate homeownership and the opportunity to build long-term home equity.",
+        rent: "The most flexible option — low commitment, and easy to change plans as life changes.",
+        rentToOwn: "A step-by-step path to owning a home — live in it now while you prepare to buy.",
+        buy: "Own the home right away and start building long-term equity.",
       },
       metrics: {
         cushionStatusLabels: {
@@ -328,27 +326,27 @@ export const en: Translations = {
         },
         monthlyPaymentLabel: "Monthly payment",
         rentToOwnMonthlyPaymentCaption: (amount) =>
-          `During the 3-year RTO period. After transitioning to normal home ownership, this adjusts to an estimated ${amount}/month mortgage payment.`,
+          `For the first 3 years. After that, it switches to an estimated ${amount}/month mortgage payment.`,
         remainingLabel: "Remaining monthly income",
         remainingPctCaption: (pct) => `${pct} of your income`,
         totalPaidLabel: "Total paid over 10 years",
         capitalValueLabel: "Capital value",
-        capitalValueYes: (formattedAmount) => `Builds an estimated capital value of ${formattedAmount} after 10 years.`,
+        capitalValueYes: (formattedAmount) => `Builds an estimated ${formattedAmount} in capital value after 10 years.`,
         capitalValueNo: "Renting builds no capital value.",
         tooltips: {
           initialPayment:
-            "The one-time cash due upfront to start this option — a down payment plus transaction fees for Buy, a contract fee for Rent-to-Own, or a security deposit and advance rent for Rent.",
-          monthlyPayment: "The recurring monthly housing cost for this option — a mortgage installment, a Rent-to-Own payment, or rent.",
+            "The one-time cash you'd need upfront — a down payment and fees for Buy, a contract fee for Rent-to-Own, or a deposit and advance rent for Rent.",
+          monthlyPayment: "Your ongoing monthly housing cost — a mortgage installment, a Rent-to-Own payment, or rent.",
           remaining:
-            "Your recurring monthly income — household income, combined with your co-borrower's, if you added one — after existing debt (including theirs), living expenses, and this option's housing payment. Annual bonus is excluded because it is not guaranteed monthly cash flow.",
-          totalPaid: "The total amount you'd pay toward housing over 10 years, including the one-time upfront cost where it applies.",
+            "What's left of your monthly income — combined with your co-borrower's, if you added one — after debt, living expenses, and this option's housing payment. Bonus isn't included, since it's not guaranteed every month.",
+          totalPaid: "The total you'd pay toward housing over 10 years, including any one-time upfront cost.",
           capitalValue: "How much property value or equity you'd have built up by year 10, if any.",
         },
       },
       nonFinancial: {
         title: "Non-Financial",
         flexibilityLabel: "Flexibility",
-        barrierToEntryLabel: "Requirement to start",
+        barrierToEntryLabel: "What it takes to start",
         debtRiskLabel: "Debt / financial commitment",
         pillars: {
           rent: {
@@ -378,15 +376,15 @@ export const en: Translations = {
     notes: {
       title: "Notes",
       disclaimer:
-        "Estimates only, based on standard debt-service, budget, and lending assumptions — not financial advice. Confirm your actual eligibility with a lender.",
+        "These are estimates based on standard lending assumptions — not financial advice. Please confirm your actual eligibility with a lender.",
       buyAssumptions: (tenureYears, interestPct, dsrPct, feePct) =>
-        `Buy figures assume a ${tenureYears}-year loan tenure, a ${interestPct} annual interest rate, a ${dsrPct} debt-service ceiling, and about ${feePct} for transfer and mortgage-registration fees — typical terms for a Thai mortgage pre-qualification. Your bank's actual offer may vary.`,
+        `Buy figures assume a ${tenureYears}-year loan term, ${interestPct} annual interest, a ${dsrPct} debt-service limit, and about ${feePct} for transfer and mortgage-registration fees — typical terms for a Thai mortgage pre-qualification. Your bank's actual offer may differ.`,
       rentAndRtoAssumptions: (yieldPct, rtoMarkupPct, rtoFeePct) =>
-        `Rent is estimated using a typical rental yield of about ${yieldPct} of the home price per year. Rent-to-Own assumes a contract price about ${rtoMarkupPct} above the home price, plus a one-time contract fee of about ${rtoFeePct}, due at signing.`,
+        `Rent is estimated from a typical rental yield of about ${yieldPct} of the home price per year. Rent-to-Own assumes a contract price about ${rtoMarkupPct} above the home price, plus a one-time contract fee of about ${rtoFeePct}, due at signing.`,
       growthAssumption: (appreciationPct) =>
-        `We assume a default annual capital growth of ${appreciationPct} for home values — a market-based estimate based on typical long-run growth for Thai residential property.`,
+        `We assume home values grow ${appreciationPct} a year by default — a market estimate based on typical long-run growth for Thai residential property.`,
       governmentSchemes:
-        "Government first-home mortgage schemes and lower interest-rate promotions run periodically in Thailand — check current offers from banks like GHB, GSB, and commercial lenders before locking in a rate.",
+        "Thailand periodically offers first-home mortgage schemes and lower-rate promotions — check current offers from banks like GHB, GSB, and commercial lenders before locking in a rate.",
     },
   },
 
