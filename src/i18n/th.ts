@@ -125,15 +125,17 @@ export const th: Translations = {
 
     purchasingPower: {
       eyebrow: "กำลังซื้อของคุณ",
-      title: "งบซื้อบ้านที่เหมาะกับคุณ",
+      title: "บ้านเป้าหมายของคุณ",
       homeBudget: "งบซื้อบ้านที่แนะนำ",
       homeBudgetCaption: "ประเมินจากรายได้ หนี้สิน และความสามารถในการผ่อนของคุณ โดยสมมติว่ามีเงินดาวน์ 10% ตามเกณฑ์ที่กำหนด",
       installment: "ค่างวดต่อเดือนที่แนะนำ",
       perMonth: (formattedAmount) => `${formattedAmount} ต่อเดือน`,
       installmentTenureNote: (years) => `โดยคำนวณจากระยะเวลาผ่อน ${years} ปี`,
       targetPriceLabel: "ราคาบ้านเป้าหมายของคุณ",
-      targetPriceHelp: "ลองปรับราคาบ้านที่ต้องการ เพื่อดูว่าห่างจากงบที่แนะนำแค่ไหน และต้องวางแผนเพิ่มอย่างไร",
+      targetPriceHelpAction: "ลองปรับราคาบ้านที่ต้องการ",
+      targetPriceHelpDetail: "เพื่อดูว่าห่างจากงบที่แนะนำแค่ไหน และต้องวางแผนเพิ่มอย่างไร",
       zoneBarLabel: "ราคาบ้านเป้าหมายของคุณอยู่ตรงไหน",
+      zoneBarRecommendedLabel: "แนะนำ",
       targetPricePrefix: "ราคาที่คุณตั้งไว้:",
       safeUpTo: (formatted) => `สบาย ไม่เกิน ${formatted}`,
       stretchUpTo: (low, high) => `ตึงมือ ${low}–${high}`,
@@ -143,6 +145,11 @@ export const th: Translations = {
         budgetBinding: (budget) => `จากรายได้และหนี้สินของคุณ เราประเมินว่าค่างวดไม่ควรเกิน ${budget} ต่อเดือน`,
         comfortBinding: (comfortable, _nextCeiling) =>
           `จากรายได้และหนี้สินของคุณ เราประเมินว่าค่างวดไม่ควรเกิน ${comfortable} ต่อเดือน`,
+      },
+      targetSummary: {
+        homePriceLabel: "ราคาบ้านเป้าหมายของคุณ",
+        installmentLabel: "ค่างวดต่อเดือน",
+        remainingLabel: "รายได้คงเหลือต่อเดือน",
       },
     },
 
@@ -292,9 +299,43 @@ export const th: Translations = {
       },
 
       comparisonTitle: "เทียบเช่า เช่าเพื่อซื้อ และซื้อ",
-      selectHint: "แตะตัวเลือกเพื่อดูช่องว่างและแผนการด้านล่าง",
+      selectHint: "คอลัมน์ที่ไฮไลต์ตรงกับตัวเลือกที่คุณเลือกไว้ด้านบน",
+      viewFullComparison: "ดูตารางเปรียบเทียบทั้งหมด",
+      hideComparison: "ซ่อนตารางเปรียบเทียบ",
       optionColumnLabel: "ตัวเลือก",
       selectedBadge: "เลือกอยู่",
+      selectedSummary: {
+        eyebrow: "แตะการ์ดเพื่อเปรียบเทียบตัวเลือกของคุณ",
+        bestForLabel: "เหมาะสำหรับ",
+        upsideLabel: "ข้อดี",
+        tradeOffLabel: "ข้อแลกเปลี่ยน",
+        whatToKnowLabel: "สิ่งที่ควรรู้",
+        content: {
+          rent: {
+            bestFor: "ความยืดหยุ่นและการผูกมัดที่น้อยกว่า",
+            upside: (formattedInitialPayment) =>
+              `ย้ายที่อยู่ได้ง่ายกว่า ใช้เงินสดล่วงหน้าน้อยกว่า — ประมาณ ${formattedInitialPayment} เพื่อเริ่มต้น`,
+            tradeOff: "ค่าเช่าที่จ่ายไปไม่สร้างส่วนของเจ้าของบ้าน",
+            whatToKnow: "เหมาะถ้าแผนชีวิต ทำเล หรือสถานะการเงินของคุณอาจยังเปลี่ยนแปลงได้",
+          },
+          rentToOwn: {
+            bestFor: "คนที่อยากมีบ้านเป็นของตัวเองในอนาคต แต่ยังไม่พร้อมซื้อตอนนี้",
+            upside: (formattedCapitalValue) =>
+              `ก้าวเข้าใกล้มูลค่าทรัพย์สินที่อาจเพิ่มขึ้นเช่นเดียวกับการซื้อ — ประเมินไว้ประมาณ ${formattedCapitalValue} ภายใน 10 ปี — ไปพร้อมกับเตรียมความพร้อมทางการเงิน`,
+            tradeOff: (formattedMonthlyPayment, formattedBuyMonthlyPayment) =>
+              `ค่าใช้จ่ายต่อเดือนมักสูงกว่าการซื้อตรงๆ — ประมาณ ${formattedMonthlyPayment} ในช่วง 3 ปีแรก เทียบกับประมาณ ${formattedBuyMonthlyPayment} สำหรับค่างวดผ่อนบ้าน`,
+            whatToKnow: "ควรอ่านเงื่อนไขสัญญา ราคาตอนเปลี่ยนผ่าน และเงื่อนไขการเป็นเจ้าของบ้านให้ละเอียด",
+          },
+          buy: {
+            bestFor: "คนที่พร้อมผูกพันกับบ้านในระยะยาว",
+            upside: (formattedCapitalValue) =>
+              `สร้างความเป็นเจ้าของและมูลค่าทรัพย์สินที่อาจเพิ่มขึ้น — ประเมินไว้ประมาณ ${formattedCapitalValue} ภายใน 10 ปี`,
+            tradeOff: (formattedInitialPayment) =>
+              `ต้องใช้เงินสดล่วงหน้ามากกว่า — ประมาณ ${formattedInitialPayment} — พร้อมภาระผูกพันระยะยาว`,
+            whatToKnow: "ตรวจสอบให้แน่ใจว่าค่างวดต่อเดือนยังเหลือพื้นที่ทางการเงินให้คุณพอสมควร",
+          },
+        },
+      },
       scenarioRent: "เช่า",
       scenarioRentToOwn: "เช่าเพื่อซื้อ",
       scenarioBuy: "ซื้อ",
@@ -325,6 +366,7 @@ export const th: Translations = {
         capitalValueLabel: "มูลค่าทรัพย์สินที่สะสมได้",
         capitalValueYes: (formattedAmount) => `สร้างมูลค่าทรัพย์สินสะสมได้ประมาณ ${formattedAmount} ภายใน 10 ปี`,
         capitalValueNo: "การเช่าไม่สร้างมูลค่าทรัพย์สินสะสม",
+        netCashFlowLabel: "กระแสเงินสดสุทธิใน 10 ปี",
         tooltips: {
           initialPayment:
             "เงินก้อนแรกที่ต้องจ่ายครั้งเดียว — เงินดาวน์และค่าธรรมเนียมสำหรับการซื้อ ค่าทำสัญญาสำหรับเช่าเพื่อซื้อ หรือเงินมัดจำและค่าเช่าล่วงหน้าสำหรับการเช่า",
@@ -333,6 +375,8 @@ export const th: Translations = {
             "รายได้ต่อเดือนที่เหลือ — รวมของผู้กู้ร่วมด้วยถ้ามี — หลังหักหนี้สิน ค่าใช้จ่ายประจำวัน และค่างวดของตัวเลือกนี้ ไม่รวมโบนัส เพราะไม่ใช่รายได้ที่การันตีทุกเดือน",
           totalPaid: "ยอดรวมที่คุณจะจ่ายเพื่อที่อยู่อาศัยตลอด 10 ปี รวมเงินก้อนแรกด้วย",
           capitalValue: "มูลค่าทรัพย์สินหรือส่วนของเจ้าของบ้านที่คุณจะสะสมได้ภายในปีที่ 10 หากมี",
+          netCashFlow:
+            "มูลค่าทรัพย์สินที่สะสมได้ ลบด้วยยอดจ่ายรวมใน 10 ปี — ผลลัพธ์ทางการเงินโดยรวมของตัวเลือกนี้ เทียบสิ่งที่สร้างได้กับสิ่งที่จ่ายไป การเช่าไม่สร้างมูลค่าทรัพย์สินสะสม กระแสเงินสดสุทธิจึงเท่ากับยอดจ่ายรวมติดลบ",
         },
       },
       nonFinancial: {

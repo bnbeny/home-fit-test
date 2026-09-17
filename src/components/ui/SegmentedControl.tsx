@@ -4,6 +4,10 @@ interface SegmentedControlProps<T extends string | number> {
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
   helperText?: string;
+  /** Suppresses the visible <label> while keeping it as the radiogroup's
+   *  aria-label — for callers (e.g. ActionStep) that already render the
+   *  same text themselves. */
+  hideLabel?: boolean;
 }
 
 export function SegmentedControl<T extends string | number>({
@@ -12,10 +16,11 @@ export function SegmentedControl<T extends string | number>({
   options,
   onChange,
   helperText,
+  hideLabel,
 }: SegmentedControlProps<T>) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-ink">{label}</label>
+      {!hideLabel && <label className="mb-2 block text-sm font-medium text-ink">{label}</label>}
       <div className="inline-flex rounded-lg bg-surface-sunken p-1" role="radiogroup" aria-label={label}>
         {options.map((option) => {
           const selected = option.value === value;

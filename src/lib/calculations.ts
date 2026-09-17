@@ -9,6 +9,7 @@ import {
   type CalculationAssumptions,
   type CalculatorResult,
   type CapitalValueByScenario,
+  type CapitalValueResult,
   type CashFlowBreakdown,
   type CashFlowRiskLevel,
   type PurchasingPowerResult,
@@ -654,6 +655,21 @@ export function calculateCapitalValue(
   };
 }
 
+/** Net Cash Flow over 10 years for one scenario in the Rent/RTO/Buy
+ *  comparison: Capital Value minus Total Paid — the single number netting
+ *  "equity built" against "cash spent" that the two rows above deliberately
+ *  keep apart (see CashFlowBreakdown.totalPaidOver10YearsTHB). Rent's
+ *  CapitalValueResult.accumulates is false, so its Capital Value counts as
+ *  ฿0 here — Net Cash Flow reduces to exactly negative Total Paid, as it
+ *  should for an option that builds no equity at all. */
+export function calculateNetCashFlow10Years(
+  cashFlow: CashFlowBreakdown,
+  capitalValue: CapitalValueResult,
+): number {
+  const capitalValueTHB = capitalValue.accumulates ? (capitalValue.amountTHB ?? 0) : 0;
+  return capitalValueTHB - cashFlow.totalPaidOver10YearsTHB;
+}
+
 /**
  * Buy vs Rent over 10 years, rooted at `homePriceBasis` — the user's
  * adjustable Target Home Price (see BuyVsRentOption). Tracks each scenario's
@@ -1015,6 +1031,15 @@ export function formatTHB(value: number): string {
     return `฿${(rounded / 1_000).toFixed(0)}K`;
   }
   return `฿${rounded.toLocaleString("en-US")}`;
+}
+
+/** Same figure as formatTHB, but with a negative value's minus sign moved in
+ *  front of the ฿ symbol ("-฿2.40M") instead of after it ("฿-2.40M") — used
+ *  wherever a signed outcome (e.g. Net Cash Flow over 10 Years) needs to read
+ *  unambiguously at a glance. */
+export function formatSignedTHB(value: number): string {
+  const rounded = Math.round(value);
+  return rounded < 0 ? `-${formatTHB(Math.abs(rounded))}` : formatTHB(rounded);
 }
 
 /** Formats a fraction (0.06) as a percentage string ("6.0%"). Used for

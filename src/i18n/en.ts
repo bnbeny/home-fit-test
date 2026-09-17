@@ -130,15 +130,17 @@ export const en: Translations = {
 
     purchasingPower: {
       eyebrow: "Your purchasing power",
-      title: "The home budget that fits you",
+      title: "Your target home",
       homeBudget: "Recommended home budget",
       homeBudgetCaption: "Estimated from your income, debt, and repayment ability, assuming the standard 10% minimum down payment.",
       installment: "Recommended monthly installment",
       perMonth: (formattedAmount) => `${formattedAmount}/mo`,
       installmentTenureNote: (years) => `over a ${years}-year loan tenure.`,
       targetPriceLabel: "Your target home price",
-      targetPriceHelp: "Try adjusting your target price to see how far it is from your recommended budget — and what you'd need to plan for.",
+      targetPriceHelpAction: "Try adjusting your target price",
+      targetPriceHelpDetail: "to see how far it is from your recommended budget — and what you'd need to plan for.",
       zoneBarLabel: "Where does your target home price land?",
+      zoneBarRecommendedLabel: "Recommended",
       targetPricePrefix: "Price you've set:",
       safeUpTo: (formatted) => `Comfortable up to ${formatted}`,
       stretchUpTo: (low, high) => `Tight ${low}–${high}`,
@@ -150,6 +152,11 @@ export const en: Translations = {
           `Based on your income and debt, we estimate the installment shouldn't exceed ${budget}/month,`,
         comfortBinding: (comfortable, _nextCeiling) =>
           `Based on your income and debt, we estimate the installment shouldn't exceed ${comfortable}/month,`,
+      },
+      targetSummary: {
+        homePriceLabel: "Your target home price",
+        installmentLabel: "Monthly installment",
+        remainingLabel: "Remaining monthly income",
       },
     },
 
@@ -300,9 +307,43 @@ export const en: Translations = {
       },
 
       comparisonTitle: "Compare rent, rent-to-own, and buy",
-      selectHint: "Tap an option to see its gap & plan below.",
+      selectHint: "Highlighted column matches the option you selected above.",
+      viewFullComparison: "View full comparison",
+      hideComparison: "Hide comparison",
       optionColumnLabel: "Option",
       selectedBadge: "Selected",
+      selectedSummary: {
+        eyebrow: "Tap a card to compare your options",
+        bestForLabel: "Best for",
+        upsideLabel: "Upside",
+        tradeOffLabel: "Trade-off",
+        whatToKnowLabel: "What to know",
+        content: {
+          rent: {
+            bestFor: "Flexibility and lower commitment.",
+            upside: (formattedInitialPayment) =>
+              `Easier to move, with less upfront cash — about ${formattedInitialPayment} to start.`,
+            tradeOff: "Payments don't build home equity.",
+            whatToKnow: "Good fit if your plans, location, or finances might still change.",
+          },
+          rentToOwn: {
+            bestFor: "Those who want a path to ownership but aren't ready to buy today.",
+            upside: (formattedCapitalValue) =>
+              `Moves you toward the same potential property value as buying — an estimated ${formattedCapitalValue} in 10 years — while you prepare financially.`,
+            tradeOff: (formattedMonthlyPayment, formattedBuyMonthlyPayment) =>
+              `Usually costs more per month than buying outright — about ${formattedMonthlyPayment} for the first 3 years, versus about ${formattedBuyMonthlyPayment} for a mortgage.`,
+            whatToKnow: "Pay close attention to the contract terms, transition price, and ownership conditions.",
+          },
+          buy: {
+            bestFor: "Those ready for a long-term home commitment.",
+            upside: (formattedCapitalValue) =>
+              `Builds ownership and potential property value — an estimated ${formattedCapitalValue} in 10 years.`,
+            tradeOff: (formattedInitialPayment) =>
+              `Requires more upfront cash — about ${formattedInitialPayment} — plus a long-term commitment.`,
+            whatToKnow: "Make sure the monthly payment still leaves enough financial flexibility.",
+          },
+        },
+      },
       scenarioRent: "Rent",
       scenarioRentToOwn: "Rent-to-Own",
       scenarioBuy: "Buy",
@@ -333,6 +374,7 @@ export const en: Translations = {
         capitalValueLabel: "Capital value",
         capitalValueYes: (formattedAmount) => `Builds an estimated ${formattedAmount} in capital value after 10 years.`,
         capitalValueNo: "Renting builds no capital value.",
+        netCashFlowLabel: "Net cash flow over 10 years",
         tooltips: {
           initialPayment:
             "The one-time cash you'd need upfront — a down payment and fees for Buy, a contract fee for Rent-to-Own, or a deposit and advance rent for Rent.",
@@ -341,6 +383,8 @@ export const en: Translations = {
             "What's left of your monthly income — combined with your co-borrower's, if you added one — after debt, living expenses, and this option's housing payment. Bonus isn't included, since it's not guaranteed every month.",
           totalPaid: "The total you'd pay toward housing over 10 years, including any one-time upfront cost.",
           capitalValue: "How much property value or equity you'd have built up by year 10, if any.",
+          netCashFlow:
+            "Capital value minus total paid over 10 years — the overall financial outcome of this option, netting what you'd build against what you'd spend. Renting builds no capital value, so its net cash flow is simply negative its total paid.",
         },
       },
       nonFinancial: {

@@ -1,26 +1,34 @@
-import { Card } from "../ui/Card";
 import { StatTile } from "./StatTile";
 import { BudgetZoneBar } from "./BudgetZoneBar";
 import { formatTHB } from "../../lib/calculations";
 import { useLanguage } from "../../i18n/LanguageContext";
-import type { PurchasingPowerResult } from "../../types/finance";
+import type { CashFlowBreakdown, PurchasingPowerResult } from "../../types/finance";
 import type { Translations } from "../../i18n/types";
 
 /** Bounds/step for the BudgetZoneBar's draggable target-price marker —
  *  matches the range the (removed) Target Home Price slider used to use. */
 const TARGET_PRICE_MIN = 500_000;
-const TARGET_PRICE_MAX = 20_000_000;
+const TARGET_PRICE_MAX = 100_000_000;
 const TARGET_PRICE_STEP = 10_000;
 
 interface PurchasingPowerProps {
   purchasingPower: PurchasingPowerResult;
   targetHomePrice: number;
   onTargetHomePriceChange: (value: number) => void;
+  /** buyVsRentByTarget.cashFlow.buy — the Buy option's monthly cash-flow
+   *  breakdown rooted at the user's own Target Home Price (not the
+   *  Recommended Home Budget). Powers the 3 target-summary cards below
+   *  (Monthly Installment, Remaining Monthly Income) with the exact same
+   *  calculation BuyVsRentComparison's own table already uses — nothing
+   *  recomputed here. */
+  targetCashFlow: CashFlowBreakdown;
 }
 
 /** Which of the three ceilings (bank DSR, household budget, personal
  *  comfort) is binding, in one sentence — so the recommended installment
- *  never reads as a black box. */
+ *  never reads as a black box. Now shown behind the Recommended Monthly
+ *  Installment reference point's (i) tooltip on the budget scale, rather
+ *  than as a permanent caption. */
 function getInstallmentRationale(
   purchasingPower: PurchasingPowerResult,
   copy: Translations["results"]["purchasingPower"]["installmentRationale"],
@@ -42,25 +50,33 @@ export function PurchasingPower({
   purchasingPower,
   targetHomePrice,
   onTargetHomePriceChange,
+  targetCashFlow,
 }: PurchasingPowerProps) {
   const { t } = useLanguage();
   const copy = t.results.purchasingPower;
+  const buyVsRentCopy = t.results.buyVsRent;
 
   return (
-    <Card title={copy.title}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div>
+      <h3 className="mb-4 text-lg font-semibold text-ink">{copy.title}</h3>
+      {/* The 3 target-summary cards lead the section — the financial impact
+          of whatever Target Home Price the user currently has selected —
+          with the budget scale (Recommended Home Budget/Installment as its
+          own labeled benchmark) below, so the user's own numbers are read
+          first and the recommended benchmark follows as context. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile label={copy.targetSummary.homePriceLabel} value={formatTHB(targetHomePrice)} />
         <StatTile
-          label={copy.homeBudget}
-          value={formatTHB(purchasingPower.maxHomePrice)}
-          caption={copy.homeBudgetCaption}
+          label={copy.targetSummary.installmentLabel}
+          value={copy.perMonth(formatTHB(targetCashFlow.housingPaymentMonthly))}
         />
-        <StatTile
-          label={copy.installment}
-          value={copy.perMonth(formatTHB(purchasingPower.recommendedMonthlyInstallment))}
-          caption={`${getInstallmentRationale(purchasingPower, copy.installmentRationale)} ${copy.installmentTenureNote(
-            purchasingPower.effectiveLoanTermYears,
-          )}`}
-        />
+        <div className="rounded-xl bg-surface-sunken p-4">
+          <p className="text-xs font-medium text-ink-muted">{copy.targetSummary.remainingLabel}</p>
+          <p className="hero-figure mt-1 text-2xl font-bold text-ink">{formatTHB(targetCashFlow.remainingMonthly)}</p>
+          <p className="mt-1 text-xs text-ink-muted">
+            {buyVsRentCopy.metrics.remainingPctCaption(`${Math.round(Math.max(0, targetCashFlow.remainingPct))}%`)}
+          </p>
+        </div>
       </div>
 
       <div className="mt-6">
@@ -72,8 +88,14 @@ export function PurchasingPower({
           min={TARGET_PRICE_MIN}
           max={TARGET_PRICE_MAX}
           step={TARGET_PRICE_STEP}
+          recommendedHomeBudget={purchasingPower.maxHomePrice}
+          recommendedHomeBudgetNote={copy.homeBudgetCaption}
+          recommendedMonthlyInstallment={purchasingPower.recommendedMonthlyInstallment}
+          recommendedMonthlyInstallmentNote={`${getInstallmentRationale(purchasingPower, copy.installmentRationale)} ${copy.installmentTenureNote(
+            purchasingPower.effectiveLoanTermYears,
+          )}`}
         />
       </div>
-    </Card>
+    </div>
   );
 }

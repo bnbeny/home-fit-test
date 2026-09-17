@@ -1,4 +1,3 @@
-import { Card } from "../ui/Card";
 import { STATUS_STYLES } from "./statusStyles";
 import { useLanguage } from "../../i18n/LanguageContext";
 import type { ReadinessResult } from "../../types/finance";
@@ -13,7 +12,8 @@ export function ReadinessScore({ readiness }: ReadinessScoreProps) {
   const statusLabel = t.results.readiness.statusLabels[readiness.status];
 
   return (
-    <Card title={t.results.readiness.eyebrow}>
+    <div>
+      <h3 className="mb-4 text-lg font-semibold text-ink">{t.results.readiness.eyebrow}</h3>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           {/* Hero figure: the one number this view leads with. */}
@@ -47,6 +47,6 @@ export function ReadinessScore({ readiness }: ReadinessScoreProps) {
           />
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

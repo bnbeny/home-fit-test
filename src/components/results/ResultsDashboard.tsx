@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "../ui/Button";
+import { Card } from "../ui/Card";
 import { ReadinessScore } from "./ReadinessScore";
 import { PurchasingPower } from "./PurchasingPower";
 import { AdvisoryNotices } from "./AdvisoryNotices";
@@ -53,12 +54,20 @@ export function ResultsDashboard({
       </div>
 
       <div className="space-y-6">
-        <ReadinessScore readiness={result.readiness} />
-        <PurchasingPower
-          purchasingPower={result.purchasingPower}
-          targetHomePrice={targetHomePrice}
-          onTargetHomePriceChange={setTargetHomePrice}
-        />
+        {/* Readiness score and target home share one card — the score is
+            the headline verdict and the target home breakdown is what
+            drives it, so they read as one continuous section rather than
+            two separate cards. */}
+        <Card>
+          <ReadinessScore readiness={result.readiness} />
+          <hr className="my-6 border-black/10" />
+          <PurchasingPower
+            purchasingPower={result.purchasingPower}
+            targetHomePrice={targetHomePrice}
+            onTargetHomePriceChange={setTargetHomePrice}
+            targetCashFlow={result.buyVsRentByTarget.cashFlow.buy}
+          />
+        </Card>
         <AdvisoryNotices notices={result.advisoryNotices} />
         <BuyVsRentComparison
           byBudget={result.buyVsRentByBudget}

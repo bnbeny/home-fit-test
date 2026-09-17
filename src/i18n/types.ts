@@ -140,8 +140,17 @@ export interface Translations {
        *  slider/input, which replaced the (removed) form-step slider — see
        *  ResultsDashboard, which owns this live value. */
       targetPriceLabel: string;
-      targetPriceHelp: string;
+      /** Split into a bold action title + a normal-weight explanation — the
+       *  first of the page's 3 numbered "what to do" prompts (see
+       *  ActionStep). */
+      targetPriceHelpAction: string;
+      targetPriceHelpDetail: string;
       zoneBarLabel: string;
+      /** Heading on the small label anchored to the Recommended Home
+       *  Budget/Installment dashed reference line on the budget scale (see
+       *  BudgetZoneBar) — sits directly above the two recommended values so
+       *  the line-to-label relationship reads at a glance. */
+      zoneBarRecommendedLabel: string;
       /** Prefix shown next to the editable Target Home Price input floating
        *  above the budget bar's marker — e.g. "Your target:" ฿[input]. The
        *  input itself is a plain number field (raw digits, no compact ฿/M
@@ -161,6 +170,17 @@ export interface Translations {
         dsrBinding: (dsr: string) => string;
         budgetBinding: (budget: string) => string;
         comfortBinding: (comfortable: string, nextCeiling: string) => string;
+      };
+      /** Labels for the 3 cards showing the financial impact of the user's
+       *  currently selected Target Home Price (see BudgetZoneBar) — replaces
+       *  the old Recommended Home Budget/Installment cards, which moved onto
+       *  the budget scale itself as labeled reference points (see
+       *  zoneBarRecommended below). Values come straight from
+       *  buyVsRentByTarget.cashFlow.buy — no new calculation. */
+      targetSummary: {
+        homePriceLabel: string;
+        installmentLabel: string;
+        remainingLabel: string;
       };
     };
 
@@ -364,19 +384,90 @@ export interface Translations {
         growthNote: (formattedPrice: string, formattedAppreciationPct: string, basisLabel: string) => string;
       };
 
-      /** Section 2 — Rent, Rent-to-Own, and Buy shown side by side (a
-       *  responsive grid: 3 columns on wider screens, stacked on mobile).
-       *  Each card is clickable — selecting one is how the Gap & Plan
-       *  section below chooses which scenario to narrate (see
-       *  GapAndPlan.tsx). */
+      /** Section 2 — the detailed Rent/Rent-to-Own/Buy comparison table
+       *  (a responsive grid: 3 columns on wider screens, stacked cards on
+       *  mobile). Comparison-only: selecting an option happens on the
+       *  OptionCardStack cards above (see selectedSummary below), not
+       *  here — this table just highlights whichever column matches that
+       *  selection. */
       comparisonTitle: string;
-      /** Instructional caption above the cards. */
+      /** Caption above the table clarifying that its highlighted column
+       *  follows the option chosen above, since the table itself no longer
+       *  accepts clicks. */
       selectHint: string;
+      /** Toggle control for the collapsible comparison table below the
+       *  selected-option highlight (see BuyVsRentComparison.tsx) — expanded
+       *  by default. Collapsing only hides the table; the selected option,
+       *  its highlight card, and every calculation stay exactly as they
+       *  were. */
+      viewFullComparison: string;
+      hideComparison: string;
       /** Top-left header cell of the desktop comparison table — labels the
        *  leftmost column, which holds every row's label. */
       optionColumnLabel: string;
-      /** Badge shown on whichever card is currently selected. */
+      /** Badge shown on whichever card/column is currently selected — in
+       *  the OptionCardStack (a control) and, purely as a static
+       *  confirmation (not a control), on the matching comparison-table
+       *  column. */
       selectedBadge: string;
+      /** The OptionCardStack — 3 cards (Rent/Rent-to-Own/Buy) shown above
+       *  the "10-Year Home Value" card and the comparison table (see
+       *  BuyVsRentComparison.tsx). This *is* the selection control now
+       *  (clicking a card sets selectedScenario, which also drives the
+       *  10-Year Home Value card, the highlighted table column, and Gap &
+       *  Plan) — the table below is comparison-only. The selected card
+       *  expands into a concise decision summary (Best for/Upside/
+       *  Trade-off/What to know); the other two stay compact, showing just
+       *  their name and scenarioNotes entry. Each option's copy may cite
+       *  one of its own already-computed CashFlowBreakdown/
+       *  CapitalValueResult figures (see the interpolation functions
+       *  below) — never a new calculation, and never repeating what the
+       *  table below already shows figure-for-figure. */
+      selectedSummary: {
+        /** Eyebrow above the 3-card stack. */
+        eyebrow: string;
+        bestForLabel: string;
+        upsideLabel: string;
+        tradeOffLabel: string;
+        whatToKnowLabel: string;
+        /** One short sentence per label, per option — see this field's own
+         *  parent doc for the reuse/no-new-calculation rule. */
+        content: {
+          rent: {
+            bestFor: string;
+            /** Interpolates CashFlowBreakdown.initialPaymentTHB (2 months'
+             *  rent), formatted. */
+            upside: (formattedInitialPayment: string) => string;
+            tradeOff: string;
+            whatToKnow: string;
+          };
+          rentToOwn: {
+            bestFor: string;
+            /** Interpolates CapitalValueResult.amountTHB at year 10
+             *  (RentToOwnResult.projectedHomeValueYear10THB — the same
+             *  projected value Buy cites), formatted. Frames RTO as moving
+             *  toward that same potential property value, not just "time to
+             *  prepare." */
+            upside: (formattedCapitalValue: string) => string;
+            /** Interpolates CashFlowBreakdown.housingPaymentMonthly for
+             *  both RTO's own flat payment and Buy's mortgage installment
+             *  on the same home, formatted — compares RTO's 3-year rate
+             *  against what a standard mortgage would cost per month. */
+            tradeOff: (formattedMonthlyPayment: string, formattedBuyMonthlyPayment: string) => string;
+            whatToKnow: string;
+          };
+          buy: {
+            bestFor: string;
+            /** Interpolates CapitalValueResult.amountTHB at year 10,
+             *  formatted. */
+            upside: (formattedCapitalValue: string) => string;
+            /** Interpolates CashFlowBreakdown.initialPaymentTHB (down
+             *  payment + transaction fees), formatted. */
+            tradeOff: (formattedInitialPayment: string) => string;
+            whatToKnow: string;
+          };
+        };
+      };
       scenarioRent: string;
       scenarioRentToOwn: string;
       scenarioBuy: string;
@@ -416,6 +507,11 @@ export interface Translations {
          *  standalone help caption — tooltips.totalPaid covers it. */
         totalPaidLabel: string;
         capitalValueLabel: string;
+        /** "Net Cash Flow over 10 Years" — Capital Value minus Total Paid
+         *  (see calculateNetCashFlow10Years), shown as its own row directly
+         *  under Capital Value, visually distinguished as the section's
+         *  bottom-line 10-year financial outcome. */
+        netCashFlowLabel: string;
         /** No "Yes"/"No" wording — the ✓/✕ icon (rendered separately)
          *  already carries that signal; this text just names the actual
          *  built-up value in plain language. Used for both Buy and RTO —
@@ -434,6 +530,7 @@ export interface Translations {
           remaining: string;
           totalPaid: string;
           capitalValue: string;
+          netCashFlow: string;
         };
       };
       /** Section 3 — non-financial pillars: short, neutral, per-scenario

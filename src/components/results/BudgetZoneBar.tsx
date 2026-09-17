@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent as ReactChangeEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { formatTHB } from "../../lib/calculations";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { InfoTooltip } from "../ui/InfoTooltip";
+import { ActionStep } from "../ui/ActionStep";
 
 const MILLION = 1_000_000;
 /** ${targetHomePrice} in millions, to 2 decimal places — e.g. 3030000 -> "3.03". */
@@ -15,28 +17,28 @@ interface BudgetZoneBarProps {
   min: number;
   max: number;
   step: number;
+  /** PurchasingPowerResult.maxHomePrice — the "Recommended Home Budget"
+   *  reference point, shown as a fixed dashed marker on the bar plus a
+   *  labeled chip above it (see the two "recommended..." props below).
+   *  Deliberately just a display of a value already computed elsewhere —
+   *  this component doesn't recalculate it. */
+  recommendedHomeBudget: number;
+  /** Explanation shown behind the (i) icon on the Recommended Home Budget
+   *  chip — the same text that used to sit permanently under the old
+   *  summary card (see PurchasingPower.tsx). */
+  recommendedHomeBudgetNote: string;
+  /** PurchasingPowerResult.recommendedMonthlyInstallment — has no natural
+   *  position on this home-price axis, so it's shown as a labeled chip
+   *  alongside the Recommended Home Budget one rather than a second marker
+   *  line. */
+  recommendedMonthlyInstallment: number;
+  /** Explanation shown behind the (i) icon on the Recommended Monthly
+   *  Installment chip — the same rationale text that used to sit
+   *  permanently under the old summary card. */
+  recommendedMonthlyInstallmentNote: string;
 }
 
 const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
-
-function DragIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M6 7l-3 3 3 3" />
-      <path d="M14 7l3 3-3 3" />
-      <path d="M3 10h14" />
-    </svg>
-  );
-}
 
 /**
  * Three fixed-meaning zones (safe -> stretch -> risk) rendered as one bar,
@@ -58,6 +60,10 @@ export function BudgetZoneBar({
   min,
   max,
   step,
+  recommendedHomeBudget,
+  recommendedHomeBudgetNote,
+  recommendedMonthlyInstallment,
+  recommendedMonthlyInstallmentNote,
 }: BudgetZoneBarProps) {
   const { t } = useLanguage();
   const copy = t.results.purchasingPower;
@@ -95,6 +101,12 @@ export function BudgetZoneBar({
   // Keep the label's own centered box from clipping past the bar's edges,
   // independent of where the (unclamped) marker line itself sits.
   const labelLeft = Math.min(88, Math.max(12, markerLeft));
+  // Where the Recommended Home Budget reference line sits on the same axis
+  // as the target marker above — a fixed point (doesn't move as the user
+  // drags their target), always within the scale by construction since
+  // scaleMax is derived from riskZoneThreshold, which is itself a multiple
+  // of recommendedHomeBudget.
+  const recommendedLeft = Math.min(100, toPct(recommendedHomeBudget));
 
   const priceFromClientX = (clientX: number) => {
     const track = trackRef.current;
@@ -135,15 +147,48 @@ export function BudgetZoneBar({
   return (
     <div>
       <p className="mb-2 text-lg font-semibold text-ink">{copy.zoneBarLabel}</p>
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-brand-blue">
-        <DragIcon className="h-3.5 w-3.5 flex-shrink-0" />
-        {copy.targetPriceHelp}
-      </p>
-      <div className="relative pb-6">
+      <ActionStep step={1} title={copy.targetPriceHelpAction} description={copy.targetPriceHelpDetail} />
+
+      {/* Extra top margin makes room for the Recommended label anchored
+          directly above the dashed reference line below — the label and
+          the line it names are kept as one visual unit (a single dashed
+          stroke running from the label straight down into the bar at
+          exactly the recommended price's position) instead of separate
+          text above the bar, so the relationship is obvious at a glance. */}
+      <div className="relative mt-16 pb-6">
         <div ref={trackRef} className="flex h-8 w-full gap-0.5 overflow-hidden rounded-full">
           <div className="h-full rounded-l-full bg-brand-mint" style={{ width: `${safeWidth}%` }} />
           <div className="h-full bg-brand-mandarin" style={{ width: `${stretchWidth}%` }} />
           <div className="h-full rounded-r-full bg-brand-critical/70" style={{ width: `${riskWidth}%` }} />
+        </div>
+
+        {/* Recommended Home Budget/Installment — one label, one continuous
+            dashed line running from the label down into the bar at the
+            recommended price's own position, so both figures read as
+            "this is what the dashed line means" rather than a caption
+            floating elsewhere on the page. Each figure's rationale (why
+            this installment, why this home price) stays available behind
+            the (i) tooltip rather than as permanent text. */}
+        <div
+          className="pointer-events-none absolute bottom-0 flex -translate-x-1/2 flex-col items-center"
+          style={{ left: `${recommendedLeft}%`, top: "-4rem" }}
+        >
+          <div className="pointer-events-auto flex items-center gap-1 whitespace-nowrap rounded-md bg-surface px-1.5 py-1 text-center leading-tight shadow-sm ring-1 ring-black/10">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                {copy.zoneBarRecommendedLabel}
+              </p>
+              <p className="tabular-figure text-xs font-bold text-ink">{formatTHB(recommendedHomeBudget)}</p>
+              <p className="tabular-figure text-xs font-bold text-ink">
+                {copy.perMonth(formatTHB(recommendedMonthlyInstallment))}
+              </p>
+            </div>
+            <InfoTooltip
+              text={`${recommendedHomeBudgetNote} ${recommendedMonthlyInstallmentNote}`}
+              placement="start"
+            />
+          </div>
+          <div className="w-0 flex-1 border-l-2 border-dashed border-ink/60" aria-hidden="true" />
         </div>
 
         <div
