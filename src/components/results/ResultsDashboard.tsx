@@ -66,6 +66,7 @@ export function ResultsDashboard({
             targetHomePrice={targetHomePrice}
             onTargetHomePriceChange={setTargetHomePrice}
             targetCashFlow={result.buyVsRentByTarget.cashFlow.buy}
+            loanForTargetHome={result.buyVsRentByTarget.wealthComparison.loanForTargetHome}
           />
         </Card>
         <AdvisoryNotices notices={result.advisoryNotices} />

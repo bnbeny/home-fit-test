@@ -14,7 +14,7 @@ interface LanguageContextValue {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: PropsWithChildren) {
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>("th");
   const value = useMemo<LanguageContextValue>(
     () => ({ language, setLanguage, t: DICTIONARIES[language] }),
     [language],

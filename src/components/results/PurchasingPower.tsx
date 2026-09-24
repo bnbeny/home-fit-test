@@ -22,6 +22,13 @@ interface PurchasingPowerProps {
    *  calculation BuyVsRentComparison's own table already uses — nothing
    *  recomputed here. */
   targetCashFlow: CashFlowBreakdown;
+  /** buyVsRentByTarget.wealthComparison.loanForTargetHome — the loan portion
+   *  of the target home price (the rest is the down payment: targetHomePrice
+   *  - loanForTargetHome). Powers the "Loan + Down payment" breakdown caption
+   *  under the target home price card, so ฿7.04M doesn't read as one opaque
+   *  number when it's actually two very different kinds of money (borrowed
+   *  vs. the household's own cash). */
+  loanForTargetHome: number;
 }
 
 /** Which of the three ceilings (bank DSR, household budget, personal
@@ -51,10 +58,12 @@ export function PurchasingPower({
   targetHomePrice,
   onTargetHomePriceChange,
   targetCashFlow,
+  loanForTargetHome,
 }: PurchasingPowerProps) {
   const { t } = useLanguage();
   const copy = t.results.purchasingPower;
   const buyVsRentCopy = t.results.buyVsRent;
+  const downPaymentForTargetHome = Math.max(0, targetHomePrice - loanForTargetHome);
 
   return (
     <div>
@@ -65,18 +74,28 @@ export function PurchasingPower({
           own labeled benchmark) below, so the user's own numbers are read
           first and the recommended benchmark follows as context. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatTile label={copy.targetSummary.homePriceLabel} value={formatTHB(targetHomePrice)} />
+        <StatTile
+          label={copy.targetSummary.homePriceLabel}
+          value={formatTHB(targetHomePrice)}
+          caption={copy.targetSummary.homePriceBreakdown(
+            formatTHB(loanForTargetHome),
+            formatTHB(downPaymentForTargetHome),
+          )}
+          tooltip={copy.targetSummary.tooltips.homePrice}
+        />
         <StatTile
           label={copy.targetSummary.installmentLabel}
           value={copy.perMonth(formatTHB(targetCashFlow.housingPaymentMonthly))}
+          tooltip={copy.targetSummary.tooltips.installment(String(purchasingPower.effectiveLoanTermYears))}
         />
-        <div className="rounded-xl bg-surface-sunken p-4">
-          <p className="text-xs font-medium text-ink-muted">{copy.targetSummary.remainingLabel}</p>
-          <p className="hero-figure mt-1 text-2xl font-bold text-ink">{formatTHB(targetCashFlow.remainingMonthly)}</p>
-          <p className="mt-1 text-xs text-ink-muted">
-            {buyVsRentCopy.metrics.remainingPctCaption(`${Math.round(Math.max(0, targetCashFlow.remainingPct))}%`)}
-          </p>
-        </div>
+        <StatTile
+          label={copy.targetSummary.remainingLabel}
+          value={formatTHB(targetCashFlow.remainingMonthly)}
+          caption={buyVsRentCopy.metrics.remainingPctCaption(
+            `${Math.round(Math.max(0, targetCashFlow.remainingPct))}%`,
+          )}
+          tooltip={copy.targetSummary.tooltips.remaining}
+        />
       </div>
 
       <div className="mt-6">

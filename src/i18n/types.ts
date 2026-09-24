@@ -181,6 +181,20 @@ export interface Translations {
         homePriceLabel: string;
         installmentLabel: string;
         remainingLabel: string;
+        /** Caption under the target home price card's value, splitting it
+         *  into its two components — e.g. "Loan ฿6.34M + down payment
+         *  ฿704K" — so the headline number doesn't read as one opaque
+         *  figure when it's actually borrowed money plus the household's
+         *  own cash. */
+        homePriceBreakdown: (loanAmount: string, downPaymentAmount: string) => string;
+        /** (i) tooltip text for each of the 3 cards, in plain-language terms
+         *  — explains where each number comes from without requiring the
+         *  reader to already understand the underlying calculation. */
+        tooltips: {
+          homePrice: string;
+          installment: (loanTermYears: string) => string;
+          remaining: string;
+        };
       };
     };
 

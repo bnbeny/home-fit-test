@@ -157,6 +157,15 @@ export const en: Translations = {
         homePriceLabel: "Your target home price",
         installmentLabel: "Monthly installment",
         remainingLabel: "Remaining monthly income",
+        homePriceBreakdown: (loanAmount, downPaymentAmount) => `Loan ${loanAmount} + down payment ${downPaymentAmount}`,
+        tooltips: {
+          homePrice:
+            "The home price you've set yourself — adjustable from the scale below. It's the base number the next two cards are calculated from.",
+          installment: (loanTermYears) =>
+            `The estimated payment if you buy at this price — based on a ${loanTermYears}-year loan, the standard interest rate, and a minimum 10% down payment.`,
+          remaining:
+            "Your income (plus your co-borrower's, if you added one) after debt, living expenses, and this target price's own monthly installment — how much financial breathing room you'd have left each month.",
+        },
       },
     },
 
